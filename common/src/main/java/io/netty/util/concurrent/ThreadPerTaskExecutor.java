@@ -20,6 +20,12 @@ import io.netty.util.internal.ObjectUtil;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
+/**
+ * 这个 Executor 主要作用是每个任务都创建线程来执行.
+ * 这个用了两个设计模式:
+ * - 命令模式(Runnable)
+ * - 委托模式(线程创建委托给 ThreadFactory)
+ */
 public final class ThreadPerTaskExecutor implements Executor {
     private final ThreadFactory threadFactory;
 

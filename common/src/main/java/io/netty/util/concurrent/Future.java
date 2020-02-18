@@ -21,6 +21,10 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The result of an asynchronous operation.
+ * 异步操作的结果, 为什么要拓展 JUC 上的 Future 呢, 主要有以下几个原因
+ * - JUC 的 Future 的 get 方法是阻塞的, 所以要提供一个非阻塞的 getNow 方法
+ * - 第二个问题就是什么时候获取结果并执行以下逻辑, 总不能一直干等吧, 所以添加 Listener 的回调, 方便任务一执行完就执行回调
+ * - 第三个就是添加了一些状态判断和只等待的方法
  */
 @SuppressWarnings("ClassNameSameAsAncestorName")
 public interface Future<V> extends java.util.concurrent.Future<V> {

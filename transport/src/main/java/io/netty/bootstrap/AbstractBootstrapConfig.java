@@ -27,10 +27,14 @@ import java.net.SocketAddress;
 import java.util.Map;
 
 /**
+ * 通用用于公开 AbstractBootstrap 的配置, 所有的配置都是直接来自于读取 AbstractBootstrap 的配置
  * Exposes the configuration of an {@link AbstractBootstrap}.
  */
 public abstract class AbstractBootstrapConfig<B extends AbstractBootstrap<B, C>, C extends Channel> {
 
+    /**
+     * AbstractBootstrap 实例
+     */
     protected final B bootstrap;
 
     protected AbstractBootstrapConfig(B bootstrap) {

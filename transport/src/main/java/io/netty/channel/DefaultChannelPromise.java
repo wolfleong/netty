@@ -24,12 +24,19 @@ import io.netty.util.concurrent.GenericFutureListener;
 import static io.netty.util.internal.ObjectUtil.checkNotNull;
 
 /**
+ * ChannelPromise 接口的默认实现
  * The default {@link ChannelPromise} implementation.  It is recommended to use {@link Channel#newPromise()} to create
  * a new {@link ChannelPromise} rather than calling the constructor explicitly.
  */
 public class DefaultChannelPromise extends DefaultPromise<Void> implements ChannelPromise, FlushCheckpoint {
 
+    /**
+     * Channel 实例
+     */
     private final Channel channel;
+    /**
+     * 检查点
+     */
     private long checkpoint;
 
     /**
@@ -53,6 +60,9 @@ public class DefaultChannelPromise extends DefaultPromise<Void> implements Chann
         this.channel = checkNotNull(channel, "channel");
     }
 
+    /**
+     * 获取执行器, 如果是 null, 则获取 Channel 关联的执行器
+     */
     @Override
     protected EventExecutor executor() {
         EventExecutor e = super.executor();
@@ -155,6 +165,7 @@ public class DefaultChannelPromise extends DefaultPromise<Void> implements Chann
 
     @Override
     protected void checkDeadLock() {
+        //判断 Channel 是否已经注册
         if (channel().isRegistered()) {
             super.checkDeadLock();
         }

@@ -161,10 +161,12 @@ import java.util.concurrent.TimeUnit;
  *     // Connection established successfully
  * }
  * </pre>
+ * 带有 Channel 的 Future , 专门用于 Channel 上面的异步操作结果
  */
 public interface ChannelFuture extends Future<Void> {
 
     /**
+     * 返回关取的 Channel
      * Returns a channel where the I/O operation associated with this
      * future takes place.
      */
@@ -195,6 +197,7 @@ public interface ChannelFuture extends Future<Void> {
     ChannelFuture awaitUninterruptibly();
 
     /**
+     * 是否无效, 如果返回 true, 则不允许执行下面的方法
      * Returns {@code true} if this {@link ChannelFuture} is a void future and so not allow to call any of the
      * following methods:
      * <ul>

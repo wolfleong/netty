@@ -16,11 +16,13 @@
 package io.netty.util.concurrent;
 
 /**
+ * Promise 是一种特殊的 Future , 可以写入状态结果
  * Special {@link Future} which is writable.
  */
 public interface Promise<V> extends Future<V> {
 
     /**
+     * 强制设置成功结果, 并且通知所有监听回调, 如果状态已经设置则报异常
      * Marks this future as a success and notifies all
      * listeners.
      *
@@ -29,6 +31,7 @@ public interface Promise<V> extends Future<V> {
     Promise<V> setSuccess(V result);
 
     /**
+     * 尝试设置成功结果, 并且通知所有监听回调, 不会抛异常, 设置成功则返回 true
      * Marks this future as a success and notifies all
      * listeners.
      *
@@ -39,6 +42,7 @@ public interface Promise<V> extends Future<V> {
     boolean trySuccess(V result);
 
     /**
+     * 强制设置失败
      * Marks this future as a failure and notifies all
      * listeners.
      *
@@ -47,6 +51,7 @@ public interface Promise<V> extends Future<V> {
     Promise<V> setFailure(Throwable cause);
 
     /**
+     * 尝试设置失败
      * Marks this future as a failure and notifies all
      * listeners.
      *
@@ -57,6 +62,7 @@ public interface Promise<V> extends Future<V> {
     boolean tryFailure(Throwable cause);
 
     /**
+     * 设置任务不可取消
      * Make this future impossible to cancel.
      *
      * @return {@code true} if and only if successfully marked this future as uncancellable or it is already done

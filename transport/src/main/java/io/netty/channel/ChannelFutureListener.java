@@ -20,6 +20,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 
 
 /**
+ * ChannelFuture 的监听器
  * Listens to the result of a {@link ChannelFuture}.  The result of the
  * asynchronous {@link Channel} I/O operation is notified once this listener
  * is added by calling {@link ChannelFuture#addListener(GenericFutureListener)}.

@@ -32,24 +32,53 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+/**
+ * Promise 接口默认的实现
+ * - 这个线程等待是直接用 Object.wait() 来实现的, 跟 FutureTask 不一样
+ * - 这个监听器列表也做了优化, 大部分的监听器只有一个, 所以当只有一个Listener时, 不创建列表, 有多个时才创建
+ * - 监听器列表是用数组实现的
+ * @param <V>
+ */
 public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(DefaultPromise.class);
     private static final InternalLogger rejectedExecutionLogger =
             InternalLoggerFactory.getInstance(DefaultPromise.class.getName() + ".rejectedExecution");
     private static final int MAX_LISTENER_STACK_DEPTH = Math.min(8,
             SystemPropertyUtil.getInt("io.netty.defaultPromise.maxListenerStackDepth", 8));
+    /**
+     * 字段原子更新器
+     */
     @SuppressWarnings("rawtypes")
     private static final AtomicReferenceFieldUpdater<DefaultPromise, Object> RESULT_UPDATER =
             AtomicReferenceFieldUpdater.newUpdater(DefaultPromise.class, Object.class, "result");
+    /**
+     * 任务执行成功后, 结果为 null 的占位对象
+     */
     private static final Object SUCCESS = new Object();
+    /**
+     * 不可取消的占位对象
+     */
     private static final Object UNCANCELLABLE = new Object();
+    /**
+     * 取消异常 CauseHolder
+     */
     private static final CauseHolder CANCELLATION_CAUSE_HOLDER = new CauseHolder(ThrowableUtil.unknownStackTrace(
             new CancellationException(), DefaultPromise.class, "cancel(...)"));
+    /**
+     * 取消异常的异常栈信息
+     */
     private static final StackTraceElement[] CANCELLATION_STACK = CANCELLATION_CAUSE_HOLDER.cause.getStackTrace();
 
+    /**
+     * 执行任务的结果
+     */
     private volatile Object result;
+    /**
+     * 事件执行器, 有可能为 null
+     */
     private final EventExecutor executor;
     /**
+     * 监听回调用对象, 如果有多个则监听回调对象的链表
      * One or more listeners. Can be a {@link GenericFutureListener} or a {@link DefaultFutureListeners}.
      * If {@code null}, it means either 1) no listeners were added yet or 2) all listeners were notified.
      *
@@ -57,17 +86,20 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
      */
     private Object listeners;
     /**
+     * 等待线程数
      * Threading - synchronized(this). We are required to hold the monitor to use Java's underlying wait()/notifyAll().
      */
     private short waiters;
 
     /**
+     * 是否正在通知 Listener
      * Threading - synchronized(this). We must prevent concurrent notification and FIFO listener notification if the
      * executor changes.
      */
     private boolean notifyingListeners;
 
     /**
+     * 用 EventExecutor 来创建一个 DefaultPromise
      * Creates a new instance.
      *
      * It is preferable to use {@link EventExecutor#newPromise()} to create a new promise
@@ -84,6 +116,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
     }
 
     /**
+     * 默认构造
      * See {@link #executor()} for expectations of the executor.
      */
     protected DefaultPromise() {
@@ -93,9 +126,11 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
 
     @Override
     public Promise<V> setSuccess(V result) {
+        //如果设置成功则返回当前对象
         if (setSuccess0(result)) {
             return this;
         }
+        //设置不成功则抛出异常
         throw new IllegalStateException("complete already: " + this);
     }
 
@@ -119,29 +154,41 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
 
     @Override
     public boolean setUncancellable() {
+        //用 UNCANCELLABLE 对象表示不可取消, 设置成功则返回 true
         if (RESULT_UPDATER.compareAndSet(this, null, UNCANCELLABLE)) {
             return true;
         }
+        //如果 CAS 替换不成功, 则表示结果已经存在, 那肯定不可以取消
         Object result = this.result;
+        //未完成或未取消的, 都算设置成功
+        //1. 上面 CAS 未成功, 表示 result 肯定不为 null, 如果 Result 为 UNCANCELLABLE , 则表示未完成, 也就是不可取消
+        //2. 如果已经取消, 则表示设置不成功, 所以 result 不为 null 且非取消的, 都算不可取消
         return !isDone0(result) || !isCancelled0(result);
     }
 
     @Override
     public boolean isSuccess() {
+        //获取结果
         Object result = this.result;
+        //结果不为null且不是 UNCANCELLABLE 且非异常
         return result != null && result != UNCANCELLABLE && !(result instanceof CauseHolder);
     }
 
     @Override
     public boolean isCancellable() {
+        //结果为 null , 才算是可取消
         return result == null;
     }
 
+    /**
+     * 设置好异常栈的取消异常
+     */
     private static final class LeanCancellationException extends CancellationException {
         private static final long serialVersionUID = 2794674970981187807L;
 
         @Override
         public Throwable fillInStackTrace() {
+            //设置异常栈
             setStackTrace(CANCELLATION_STACK);
             return this;
         }
@@ -157,17 +204,28 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         return cause0(result);
     }
 
+    /**
+     * 获取异常
+     * @param result
+     * @return
+     */
     private Throwable cause0(Object result) {
+        //如果 result 不是 CauseHolder, 直接返回 null
         if (!(result instanceof CauseHolder)) {
             return null;
         }
+        //如果是取消异常
         if (result == CANCELLATION_CAUSE_HOLDER) {
+            //创建 LeanCancellationException
             CancellationException ce = new LeanCancellationException();
+            //如果能替换, 则直接返回
             if (RESULT_UPDATER.compareAndSet(this, CANCELLATION_CAUSE_HOLDER, new CauseHolder(ce))) {
                 return ce;
             }
+            //否则, 获取异常结果
             result = this.result;
         }
+        //强转, 获取结果中的异常
         return ((CauseHolder) result).cause;
     }
 
@@ -179,7 +237,9 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
             addListener0(listener);
         }
 
+        //如果已经完居
         if (isDone()) {
+            //通知 Listener
             notifyListeners();
         }
 
@@ -233,24 +293,34 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         return this;
     }
 
+    /**
+     * 等待
+     */
     @Override
     public Promise<V> await() throws InterruptedException {
+        //如果完成, 则返回
         if (isDone()) {
             return this;
         }
 
+        //如果线程已经中断, 则直接抛出异常, 下面的 wait()方法在会自动响应中断
         if (Thread.interrupted()) {
             throw new InterruptedException(toString());
         }
 
+        //检查列锁
         checkDeadLock();
 
         synchronized (this) {
+            //条件不符合则不退出
             while (!isDone()) {
+                //增加等待线程数
                 incWaiters();
                 try {
+                    //等待
                     wait();
                 } finally {
+                    //减少
                     decWaiters();
                 }
             }
@@ -455,6 +525,11 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         return executor;
     }
 
+    /**
+     * 检查死锁
+     * - 唤醒等待的线程是由 EventExecutor 中的线程执行的,
+     *   如果当前线程是 EventExecutor 中的线程然后 wait 的话, 就没办法唤醒前面等待的线程了
+     */
     protected void checkDeadLock() {
         EventExecutor e = executor();
         if (e != null && e.inEventLoop()) {
@@ -480,13 +555,17 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
     }
 
     private void notifyListeners() {
+        //获取事件执行器
         EventExecutor executor = executor();
+        //事件执行器在事件循环中, 也就是执行器的线程是当前的线程
         if (executor.inEventLoop()) {
+            //todo wolfleong 找时间看看这里的作用
             final InternalThreadLocalMap threadLocals = InternalThreadLocalMap.get();
             final int stackDepth = threadLocals.futureListenerStackDepth();
             if (stackDepth < MAX_LISTENER_STACK_DEPTH) {
                 threadLocals.setFutureListenerStackDepth(stackDepth + 1);
                 try {
+                    //通知 Listener
                     notifyListenersNow();
                 } finally {
                     threadLocals.setFutureListenerStackDepth(stackDepth);
@@ -495,6 +574,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
             }
         }
 
+        //用指定的 executor 来执行回调
         safeExecute(executor, new Runnable() {
             @Override
             public void run() {
@@ -504,6 +584,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
     }
 
     /**
+     * 静态方法执行回调
      * The logic in this method should be identical to {@link #notifyListeners()} but
      * cannot share code because the listener(s) cannot be cached for an instance of {@link DefaultPromise} since the
      * listener(s) may be changed and is protected by a synchronized operation.
@@ -535,28 +616,40 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
 
     private void notifyListenersNow() {
         Object listeners;
+        //同步处理
         synchronized (this) {
+            //如果正在通知或没有 Listener, 直接返回
             // Only proceed if there are listeners to notify and we are not already notifying listeners.
             if (notifyingListeners || this.listeners == null) {
                 return;
             }
+            //标记正在通知
             notifyingListeners = true;
+            //获取
             listeners = this.listeners;
+            //设置全局变量为空
             this.listeners = null;
         }
+        //遍历
         for (;;) {
+            //如果是列表, 则遍历执行回调
             if (listeners instanceof DefaultFutureListeners) {
                 notifyListeners0((DefaultFutureListeners) listeners);
             } else {
+                //执行单个回调
                 notifyListener0(this, (GenericFutureListener<?>) listeners);
             }
+            //同步
             synchronized (this) {
+                //如果没有新的监听器加入
                 if (this.listeners == null) {
+                    //更改状态并返回
                     // Nothing can throw from within this method, so setting notifyingListeners back to false does not
                     // need to be in a finally block.
                     notifyingListeners = false;
                     return;
                 }
+                //如果有新监听器加入, 获取并开启新的一轮循环
                 listeners = this.listeners;
                 this.listeners = null;
             }
@@ -582,36 +675,60 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         }
     }
 
+    /**
+     * 添加监听回调
+     */
     private void addListener0(GenericFutureListener<? extends Future<? super V>> listener) {
+        //如果原来没有, 则直接赋值
         if (listeners == null) {
             listeners = listener;
+            //如果是 DefaultFutureListeners
         } else if (listeners instanceof DefaultFutureListeners) {
+            //则直接添加到 DefaultFutureListeners 中
             ((DefaultFutureListeners) listeners).add(listener);
         } else {
+            //如果有超过两个监听回调, 则创建 DefaultFutureListeners
             listeners = new DefaultFutureListeners((GenericFutureListener<?>) listeners, listener);
         }
     }
 
+    /**
+     * 删除
+     */
     private void removeListener0(GenericFutureListener<? extends Future<? super V>> listener) {
+        //如果是列表, 则调用列表的删除方法
         if (listeners instanceof DefaultFutureListeners) {
             ((DefaultFutureListeners) listeners).remove(listener);
+            //如果只有一个, 则置空
         } else if (listeners == listener) {
             listeners = null;
         }
     }
 
+    /**
+     * 设置成功执行, 如果结果值为 null, 则用 SUCCESS 来替换
+     */
     private boolean setSuccess0(V result) {
         return setValue0(result == null ? SUCCESS : result);
     }
 
+    /**
+     * 设置异常
+     */
     private boolean setFailure0(Throwable cause) {
         return setValue0(new CauseHolder(checkNotNull(cause, "cause")));
     }
 
+    /**
+     * 设置执行结果状态值
+     */
     private boolean setValue0(Object objResult) {
+        //原子更新 result 字段为 objResult
         if (RESULT_UPDATER.compareAndSet(this, null, objResult) ||
             RESULT_UPDATER.compareAndSet(this, UNCANCELLABLE, objResult)) {
+            //如果结果已经设置好, 则
             if (checkNotifyWaiters()) {
+                //通知 Listener
                 notifyListeners();
             }
             return true;
@@ -620,6 +737,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
     }
 
     /**
+     * 判断是否有线程等待, 如果有则唤醒
      * Check if there are any waiters and if so notify these.
      * @return {@code true} if there are any listeners attached to the promise, {@code false} otherwise.
      */
@@ -627,9 +745,13 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         if (waiters > 0) {
             notifyAll();
         }
+        //如果有 Listener 则返回 true
         return listeners != null;
     }
 
+    /**
+     * 增加线程数量
+     */
     private void incWaiters() {
         if (waiters == Short.MAX_VALUE) {
             throw new IllegalStateException("too many waiters: " + this);
@@ -637,6 +759,9 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         ++waiters;
     }
 
+    /**
+     * 减少等土待线程数量
+     */
     private void decWaiters() {
         --waiters;
     }
@@ -650,6 +775,9 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         PlatformDependent.throwException(cause);
     }
 
+    /**
+     * 等待
+     */
     private boolean await0(long timeoutNanos, boolean interruptable) throws InterruptedException {
         if (isDone()) {
             return true;
@@ -821,14 +949,25 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         }
     }
 
+    /**
+     * 判断是否取消
+     */
     private static boolean isCancelled0(Object result) {
+        //结果是异常, 且异常是 CancellationException
         return result instanceof CauseHolder && ((CauseHolder) result).cause instanceof CancellationException;
     }
 
+    /**
+     * 判断任务是否执行完成
+     */
     private static boolean isDone0(Object result) {
+        //有结果且任务可被取消
         return result != null && result != UNCANCELLABLE;
     }
 
+    /**
+     * 异常持有者类
+     */
     private static final class CauseHolder {
         final Throwable cause;
         CauseHolder(Throwable cause) {
@@ -836,6 +975,9 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         }
     }
 
+    /**
+     * 用 Executor 执行 task
+     */
     private static void safeExecute(EventExecutor executor, Runnable task) {
         try {
             executor.execute(task);

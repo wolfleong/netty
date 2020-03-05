@@ -44,9 +44,21 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractChannel.class);
 
+    /**
+     * 父 Channel
+     */
     private final Channel parent;
+    /**
+     * Channel 的唯一 id
+     */
     private final ChannelId id;
+    /**
+     * Unsafe 对象, 这里的 Unsafe 并不是 sun.mic.Unsafe , 而是 Netty 自己封装的
+     */
     private final Unsafe unsafe;
+    /**
+     * 默认的 DefaultChannelPipeline
+     */
     private final DefaultChannelPipeline pipeline;
     private final VoidChannelPromise unsafeVoidPromise = new VoidChannelPromise(this, false);
     private final CloseFuture closeFuture = new CloseFuture(this);
@@ -70,8 +82,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      */
     protected AbstractChannel(Channel parent) {
         this.parent = parent;
+        //创建 ChannelId, 用于标识 Channel 的唯一
         id = newId();
+        //创建 Unsafe 的实现
         unsafe = newUnsafe();
+        //创建 ChannelPipeline
         pipeline = newChannelPipeline();
     }
 
@@ -451,19 +466,26 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void register(EventLoop eventLoop, final ChannelPromise promise) {
+            //判断 EventLoop 非空
             ObjectUtil.checkNotNull(eventLoop, "eventLoop");
+            //判断 Channel 是否已经注册
             if (isRegistered()) {
+                //如果注册则设置异步结果已经失败
                 promise.setFailure(new IllegalStateException("registered to an event loop already"));
                 return;
             }
+            //判断 EventLoop 是否合适当前 Channel
             if (!isCompatible(eventLoop)) {
+                //不合适则设置异步失败
                 promise.setFailure(
                         new IllegalStateException("incompatible event loop type: " + eventLoop.getClass().getName()));
                 return;
             }
 
+            //设置 EventLoop 属性
             AbstractChannel.this.eventLoop = eventLoop;
 
+            //在 EventLoop 中执行注册逻辑
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
@@ -478,37 +500,57 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     logger.warn(
                             "Force-closing a channel whose registration task was not accepted by an event loop: {}",
                             AbstractChannel.this, t);
+                    //强制关闭
                     closeForcibly();
+                    //通知 closeFuture 已经关闭
                     closeFuture.setClosed();
+                    //设置异步结果异常
                     safeSetFailure(promise, t);
                 }
             }
         }
 
+        /**
+         * 真正的注册操作
+         */
         private void register0(ChannelPromise promise) {
             try {
+                //确保 promise 是不可被取消的, 因为一旦开启注册, 则不能中断
+                //确保 Channel 是打开的
                 // check if the channel is still open as it could be closed in the mean time when the register
                 // call was outside of the eventLoop
                 if (!promise.setUncancellable() || !ensureOpen(promise)) {
                     return;
                 }
+                //记录是否为首次注册
                 boolean firstRegistration = neverRegistered;
+                //执行注册逻辑
                 doRegister();
+                //标记首次注册为 false
                 neverRegistered = false;
+                //设置 Channel 已经注册
                 registered = true;
 
+                //如果需要, 则触发 HandlerAdd 事件
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
                 pipeline.invokeHandlerAddedIfNeeded();
 
+                //回调通知 promise 成功
                 safeSetSuccess(promise);
+                //触发通知已经注册事件
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
+                //如果当前 Channel 是激活状态
                 if (isActive()) {
+                    //如果是第一次注册, 则触发 ChannelActive 事件
                     if (firstRegistration) {
+                        //todo wolfleong 这里为什么触发 channelActive , 在doBind0()的逻辑中不是已经触发过一次了吗
                         pipeline.fireChannelActive();
+                        //如果是自动读
                     } else if (config().isAutoRead()) {
+                        //开启读事件
                         // This channel was registered before and autoRead() is set. This means we need to begin read
                         // again so that we process inbound data.
                         //
@@ -526,6 +568,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void bind(final SocketAddress localAddress, final ChannelPromise promise) {
+            //判断是否在 EventLoop 的线程中
             assertEventLoop();
 
             if (!promise.setUncancellable() || !ensureOpen(promise)) {
@@ -545,24 +588,31 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                         "address (" + localAddress + ") anyway as requested.");
             }
 
+            //记录 Channel 是否激活
             boolean wasActive = isActive();
             try {
+                //绑定
                 doBind(localAddress);
             } catch (Throwable t) {
+                //有异常则设置异步结果失败
                 safeSetFailure(promise, t);
                 closeIfClosed();
                 return;
             }
 
+            //如果原来没激活, 是新激活的, 则触发通知 Channel active 事件
             if (!wasActive && isActive()) {
+                //向 Channel 的 Executor 中提交任务
                 invokeLater(new Runnable() {
                     @Override
                     public void run() {
+                        //触发 channelActive
                         pipeline.fireChannelActive();
                     }
                 });
             }
 
+            //设置异步绑定成功
             safeSetSuccess(promise);
         }
 
@@ -833,21 +883,26 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void beginRead() {
+            //判断是否在 EventLoop 线程中
             assertEventLoop();
 
+            //如果 Channel 没激活则不处理
             if (!isActive()) {
                 return;
             }
 
             try {
+                //执行开始读取
                 doBeginRead();
             } catch (final Exception e) {
+                //如果异常, 则通知回调方法
                 invokeLater(new Runnable() {
                     @Override
                     public void run() {
                         pipeline.fireExceptionCaught(e);
                     }
                 });
+                //关闭
                 close(voidPromise());
             }
         }
@@ -1002,6 +1057,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             close(voidPromise());
         }
 
+        /**
+         * todo wolfleong 没有理解这段注释的意思
+         */
         private void invokeLater(Runnable task) {
             try {
                 // This method is used by outbound operation implementations to trigger an inbound event later.

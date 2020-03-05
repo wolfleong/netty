@@ -166,6 +166,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
+     * 配置 SocketAddress
      * The {@link SocketAddress} which is used to bind the local "end" to.
      */
     public B localAddress(SocketAddress localAddress) {
@@ -174,6 +175,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
+     * 配置端口
      * @see #localAddress(SocketAddress)
      */
     public B localAddress(int inetPort) {
@@ -181,6 +183,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
+     * 配置地址和端口
      * @see #localAddress(SocketAddress)
      */
     public B localAddress(String inetHost, int inetPort) {
@@ -260,18 +263,22 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
+     * 用配置的地址和端口进行绑定
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind() {
         validate();
         SocketAddress localAddress = this.localAddress;
+        //如果没有指定本地地址, 则报错
         if (localAddress == null) {
             throw new IllegalStateException("localAddress not set");
         }
+        //执行绑定逻辑
         return doBind(localAddress);
     }
 
     /**
+     * 指定端口进行绑定
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind(int inetPort) {
@@ -293,45 +300,68 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
+     * 绑定操作的通用逻辑
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind(SocketAddress localAddress) {
+        //执行校验方法
         validate();
+        //执行真正的绑定逻辑
         return doBind(ObjectUtil.checkNotNull(localAddress, "localAddress"));
     }
 
+    /**
+     * 绑定的逻辑
+     */
     private ChannelFuture doBind(final SocketAddress localAddress) {
+        //初始化并注册, 返回注册的异步结果
         final ChannelFuture regFuture = initAndRegister();
+        //获取 ChannelFuture 中的 Channel
         final Channel channel = regFuture.channel();
+        //如果结果有异常, 则直接返回
         if (regFuture.cause() != null) {
             return regFuture;
         }
 
+        //如果注册操作已经完成
         if (regFuture.isDone()) {
+            //创建一个 ChannelPromise 用于返回异步绑定的结果
             // At this point we know that the registration was complete and successful.
             ChannelPromise promise = channel.newPromise();
+            //执行绑定
             doBind0(regFuture, channel, localAddress, promise);
+            //返回绑定的结果
             return promise;
+            //如果注册未完成
         } else {
+            //创建 PendingRegistrationPromise , 用于返回异步操作绑定的结果
             // Registration future is almost always fulfilled already, but just in case it's not.
             final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
+            //在注册的异步结果上注注册一个 ChannelFutureListener
             regFuture.addListener(new ChannelFutureListener() {
                 @Override
                 public void operationComplete(ChannelFuture future) throws Exception {
+                    //获取异常
                     Throwable cause = future.cause();
+                    //如果异常不为 null
                     if (cause != null) {
+                        //设置失败
                         // Registration on the EventLoop failed so fail the ChannelPromise directly to not cause an
                         // IllegalStateException once we try to access the EventLoop of the Channel.
                         promise.setFailure(cause);
+                        //如果异常为 null
                     } else {
+                        //设置已经注册
                         // Registration was successful, so set the correct executor to use.
                         // See https://github.com/netty/netty/issues/2586
                         promise.registered();
 
+                        //执行绑定逻辑
                         doBind0(regFuture, channel, localAddress, promise);
                     }
                 }
             });
+            //返回异步结果
             return promise;
         }
     }
@@ -339,24 +369,34 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+            //用 ChannelFactory 创建 Channel 实例
             channel = channelFactory.newChannel();
+            //初始化 Channel
             init(channel);
         } catch (Throwable t) {
+            //如果 Channel 已经创建
             if (channel != null) {
+                //强制关闭
                 // channel can be null if newChannel crashed (eg SocketException("too many open files"))
                 channel.unsafe().closeForcibly();
                 // as the Channel is not registered yet we need to force the usage of the GlobalEventExecutor
                 return new DefaultChannelPromise(channel, GlobalEventExecutor.INSTANCE).setFailure(t);
             }
+            //返回一个失败的 Promise
             // as the Channel is not registered yet we need to force the usage of the GlobalEventExecutor
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
+        //注册 Channel 到 EventLoopGroup 中
         ChannelFuture regFuture = config().group().register(channel);
+        //如果发生异常
         if (regFuture.cause() != null) {
+            //判断是否已经注册
             if (channel.isRegistered()) {
+                //如果注册则正常关闭
                 channel.close();
             } else {
+                //没注册则强制关闭, 也就是不会触发通知事件
                 channel.unsafe().closeForcibly();
             }
         }
@@ -379,14 +419,18 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             final ChannelFuture regFuture, final Channel channel,
             final SocketAddress localAddress, final ChannelPromise promise) {
 
+        //往 Channel 绑定的 EventLoop 中提交一个任务
         // This method is invoked before channelRegistered() is triggered.  Give user handlers a chance to set up
         // the pipeline in its channelRegistered() implementation.
         channel.eventLoop().execute(new Runnable() {
             @Override
             public void run() {
+                //如果注册结果成功
                 if (regFuture.isSuccess()) {
+                    //执行 Channel 的绑定
                     channel.bind(localAddress, promise).addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
                 } else {
+                    //否则设置失败
                     promise.setFailure(regFuture.cause());
                 }
             }
@@ -500,6 +544,10 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         return buf.toString();
     }
 
+    /**
+     * 等待注册的异步结果
+     * - 添加一个是否注册的方法
+     */
     static final class PendingRegistrationPromise extends DefaultChannelPromise {
 
         // Is set to the correct EventExecutor once the registration was successful. Otherwise it will
@@ -510,19 +558,24 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             super(channel);
         }
 
+        /**
+         * 设置已经注册
+         */
         void registered() {
             registered = true;
         }
 
         @Override
         protected EventExecutor executor() {
+            //如果已经注册, 则返回父执行器
             if (registered) {
                 // If the registration was a success executor is set.
                 //
                 // See https://github.com/netty/netty/issues/2586
                 return super.executor();
             }
-            // The registration failed so we can only use the GlobalEventExecutor as last resort to notify.
+            //注册失败, 只能用 GlobalEventExecutor 来唤醒
+            // the registration failed so we can only use the globaleventexecutor as last resort to notify.
             return GlobalEventExecutor.INSTANCE;
         }
     }

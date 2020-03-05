@@ -642,8 +642,11 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     final void invokeHandlerAddedIfNeeded() {
+        //确保当前线程在 EventLoop 中
         assert channel.eventLoop().inEventLoop();
+        //如果是第一次注册
         if (firstRegistration) {
+            //标记非第一次注册
             firstRegistration = false;
             // We are now registered to the EventLoop. It's time to call the callbacks for the ChannelHandlers,
             // that were added before the registration was done.

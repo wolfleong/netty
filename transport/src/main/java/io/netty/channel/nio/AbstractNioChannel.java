@@ -50,8 +50,17 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(AbstractNioChannel.class);
 
+    /**
+     * 原生的 Channel
+     */
     private final SelectableChannel ch;
+    /**
+     * 感兴趣的事件
+     */
     protected final int readInterestOp;
+    /**
+     * 原生的 SelectionKey
+     */
     volatile SelectionKey selectionKey;
     boolean readPending;
     private final Runnable clearReadPendingRunnable = new Runnable() {
@@ -78,12 +87,16 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      */
     protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
         super(parent);
+        //保存 java.nio.ServerSocketChannel
         this.ch = ch;
+        //感兴趣的事件
         this.readInterestOp = readInterestOp;
         try {
+            //设置原生 Channel 非阻塞
             ch.configureBlocking(false);
         } catch (IOException e) {
             try {
+                //如果发生异常则关闭 ch
                 ch.close();
             } catch (IOException e2) {
                 logger.warn(
@@ -374,18 +387,28 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
     @Override
     protected void doRegister() throws Exception {
+        //是否执行过 select 操作
         boolean selected = false;
         for (;;) {
             try {
+                //Java 原生的 Channel 注册到 Selector 中, 并返回 SelectionKey 存起来
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
+                //如果有 CancelledKeyException 异常
             } catch (CancelledKeyException e) {
+                //如果还没有执行过 selectNow()
                 if (!selected) {
+                    //这里进行强制 selectNow , 是因为这个被返回的 SelectionKey 已经被取消了, 但还缓存着没被删除,
+                    // 有可能是没有执行过 select 操作, 所以执行一下 selectNow 清除缓存, 然后再次尝试注册
                     // Force the Selector to select now as the "canceled" SelectionKey may still be
                     // cached and not removed because no Select.select(..) operation was called yet.
+                    //强制执行 selectNow
                     eventLoop().selectNow();
+                    //标记为已经执行 selectNow
                     selected = true;
                 } else {
+                    //如果已经执行过 selectNow , 则将异常直接抛出
+                    //执行过 select 操作了如果还有被取消的 SelectionKey 返回, 那这个 selectionKey 依然被缓存着, 可能是jdk的bug
                     // We forced a select operation on the selector before but the SelectionKey is still cached
                     // for whatever reason. JDK bug ?
                     throw e;
@@ -401,16 +424,21 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
     @Override
     protected void doBeginRead() throws Exception {
+        //获取 SelectionKey
         // Channel.read() or ChannelHandlerContext.read() was called
         final SelectionKey selectionKey = this.selectionKey;
+        //判断 SelectionKey 是否有效
         if (!selectionKey.isValid()) {
             return;
         }
 
         readPending = true;
 
+        //获取感兴取的事件
         final int interestOps = selectionKey.interestOps();
+        //检测如果没有读事件
         if ((interestOps & readInterestOp) == 0) {
+            //增加读事件
             selectionKey.interestOps(interestOps | readInterestOp);
         }
     }

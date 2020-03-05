@@ -166,6 +166,9 @@ public final class SocketUtils {
         }
     }
 
+    /**
+     * 根据域名地址和端口创建 InetSocketAddress
+     */
     public static InetSocketAddress socketAddress(final String hostname, final int port) {
         return AccessController.doPrivileged(new PrivilegedAction<InetSocketAddress>() {
             @Override

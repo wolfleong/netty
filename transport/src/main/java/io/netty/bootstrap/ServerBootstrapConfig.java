@@ -25,6 +25,7 @@ import io.netty.util.internal.StringUtil;
 import java.util.Map;
 
 /**
+ * ServerBootstrap 的公开配置类
  * Exposes the configuration of a {@link ServerBootstrapConfig}.
  */
 public final class ServerBootstrapConfig extends AbstractBootstrapConfig<ServerBootstrap, ServerChannel> {

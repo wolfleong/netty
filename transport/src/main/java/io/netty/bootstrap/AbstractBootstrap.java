@@ -366,6 +366,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         }
     }
 
+    /**
+     * 初始化和注册
+     */
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
@@ -413,6 +416,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         return regFuture;
     }
 
+    /**
+     * 具体子类实现初始化内容
+     */
     abstract void init(Channel channel) throws Exception;
 
     private static void doBind0(
@@ -501,6 +507,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         return copiedMap(attrs);
     }
 
+    /**
+     * 复制一个不可变的Map
+     */
     static <K, V> Map<K, V> copiedMap(Map<K, V> map) {
         if (map.isEmpty()) {
             return Collections.emptyMap();

@@ -70,6 +70,9 @@ public abstract class ChannelInitializer<C extends Channel> extends ChannelInbou
      */
     protected abstract void initChannel(C ch) throws Exception;
 
+    /**
+     * 在 channelRegistered 调用 initChannel
+     */
     @Override
     @SuppressWarnings("unchecked")
     public final void channelRegistered(ChannelHandlerContext ctx) throws Exception {
@@ -100,6 +103,10 @@ public abstract class ChannelInitializer<C extends Channel> extends ChannelInbou
     }
 
     /**
+     * 为什么要在 handlerAdd 事件中调用 initChannel 呢, 因为只有在初始化时添加 ChannelHandler 到 ChannelPipeline
+     * 才会在 Channel 注册时被触发 channelRegistered , 并且只触发一次, 而且在之后添加的 ChannelHandler 不会再次调
+     * 用 channelRegistered 了, 但是会调用 handlerAdded().
+     * todo wolfleong 其实我觉得可以不要 channelRegistered() 中调用 initChannel 也行, 因为最终 handlerAdded 会调用
      * {@inheritDoc} If override this method ensure you call super!
      */
     @Override

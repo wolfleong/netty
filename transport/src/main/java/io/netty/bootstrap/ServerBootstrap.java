@@ -39,6 +39,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * AbstractBootStrap 的实现类, 用于启动 ServerChannel 的启动器
+ * - 与 Bootstrap 的区别是有子 Channel 相关的配置
  * {@link Bootstrap} sub-class which allows easy bootstrap of {@link ServerChannel}
  *
  */
@@ -46,16 +48,34 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ServerBootstrap.class);
 
+    /**
+     * 子 Channel 的 option 集合
+     */
     // The order in which child ChannelOptions are applied is important they may depend on each other for validation
     // purposes.
     private final Map<ChannelOption<?>, Object> childOptions = new LinkedHashMap<ChannelOption<?>, Object>();
+    /**
+     * 子 Channel 的属性集合
+     */
     private final Map<AttributeKey<?>, Object> childAttrs = new ConcurrentHashMap<AttributeKey<?>, Object>();
+    /**
+     * 配置类
+     */
     private final ServerBootstrapConfig config = new ServerBootstrapConfig(this);
+    /**
+     * 子 Channel 的 EventLoop 对象
+     */
     private volatile EventLoopGroup childGroup;
+    /**
+     * 子 Channel 的处理器
+     */
     private volatile ChannelHandler childHandler;
 
     public ServerBootstrap() { }
 
+    /**
+     * 通过 ServerBootstrap 来创建, 私有构造方法
+     */
     private ServerBootstrap(ServerBootstrap bootstrap) {
         super(bootstrap);
         childGroup = bootstrap.childGroup;
@@ -67,6 +87,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     }
 
     /**
+     * 用一个 EventLoopGroup 作为 parentGroup 和
      * Specify the {@link EventLoopGroup} which is used for the parent (acceptor) and the child (client).
      */
     @Override
@@ -75,6 +96,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     }
 
     /**
+     * 设置 parentGroup 和 childGroup
      * Set the {@link EventLoopGroup} for the parent (acceptor) and the child (client). These
      * {@link EventLoopGroup}'s are used to handle all the events and IO for {@link ServerChannel} and
      * {@link Channel}'s.
@@ -89,6 +111,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     }
 
     /**
+     * 设置 childOption
      * Allow to specify a {@link ChannelOption} which is used for the {@link Channel} instances once they get created
      * (after the acceptor accepted the {@link Channel}). Use a value of {@code null} to remove a previous set
      * {@link ChannelOption}.
@@ -96,7 +119,9 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     public <T> ServerBootstrap childOption(ChannelOption<T> childOption, T value) {
         ObjectUtil.checkNotNull(childOption, "childOption");
         synchronized (childOptions) {
+            //如果值为 null
             if (value == null) {
+                //删除当前 option
                 childOptions.remove(childOption);
             } else {
                 childOptions.put(childOption, value);
@@ -106,6 +131,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     }
 
     /**
+     * 设置 childAttrs
      * Set the specific {@link AttributeKey} with the given value on every child {@link Channel}. If the value is
      * {@code null} the {@link AttributeKey} is removed
      */
@@ -120,6 +146,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     }
 
     /**
+     * 设置 childHandler
      * Set the {@link ChannelHandler} which is used to serve the request for the {@link Channel}'s.
      */
     public ServerBootstrap childHandler(ChannelHandler childHandler) {
@@ -129,28 +156,44 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
     @Override
     void init(Channel channel) {
+        //初始化 Channel 的 option
         setChannelOptions(channel, newOptionsArray(), logger);
+        //初始化 Channel 的属性集合
         setAttributes(channel, attrs0().entrySet().toArray(EMPTY_ATTRIBUTE_ARRAY));
 
+        //获取当前 Channel 的 ChannelPipeline
         ChannelPipeline p = channel.pipeline();
 
+        //获取 childGroup
         final EventLoopGroup currentChildGroup = childGroup;
+        //获取 childHandler
         final ChannelHandler currentChildHandler = childHandler;
+        // childOptions
         final Entry<ChannelOption<?>, Object>[] currentChildOptions;
         synchronized (childOptions) {
             currentChildOptions = childOptions.entrySet().toArray(EMPTY_OPTION_ARRAY);
         }
+        //childAttrs
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = childAttrs.entrySet().toArray(EMPTY_ATTRIBUTE_ARRAY);
 
+        //添加 ServerBootstrapAcceptor 到 pipeline 中。
         p.addLast(new ChannelInitializer<Channel>() {
             @Override
             public void initChannel(final Channel ch) {
                 final ChannelPipeline pipeline = ch.pipeline();
+                //添加用户设置的 ChannelHandler
                 ChannelHandler handler = config.handler();
                 if (handler != null) {
                     pipeline.addLast(handler);
                 }
 
+                //这里为什么要用 ch.eventLoop 来执行呢
+                //原因: https://github.com/lightningMan/netty/commit/4638df20628a8987c8709f0f8e5f3679a914ce1a
+                //按我的理解:
+                // 1. ServerBootstrapAcceptor 必须添加在所有配置处理器之后
+                // 2. 按照正常的顺序来添加的话, channelHandler 肯定会在 ServerBootstrapAcceptor 之前就完成配置了, 但是
+                //    如果用户在 ServerBootstrap.handler(...) 使用 ChannelInitializer 并且使用 ch.eventLoop().execute(()-> pipeline.addLast)
+                //    来添加配置的 ChannelHandler 的话, 如果下面没用 ch.eventLoop , 则有可能将用户配置的处理器放到 ServerBootstrapAcceptor 之后
                 ch.eventLoop().execute(new Runnable() {
                     @Override
                     public void run() {
@@ -251,6 +294,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     @Override
     @SuppressWarnings("CloneDoesntCallSuperClone")
     public ServerBootstrap clone() {
+        //调用构造器, 重新构造一个 ServerBootstrap
         return new ServerBootstrap(this);
     }
 

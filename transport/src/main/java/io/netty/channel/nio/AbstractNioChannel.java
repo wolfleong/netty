@@ -71,10 +71,14 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     };
 
     /**
+     * 目前正在连接远程地址的 ChannelPromise 对象。
      * The future of the current connection attempt.  If not null, subsequent
      * connection attempts will fail.
      */
     private ChannelPromise connectPromise;
+    /**
+     * 连接超时关闭的定时任务异步结果
+     */
     private ScheduledFuture<?> connectTimeoutFuture;
     private SocketAddress requestedRemoteAddress;
 
@@ -252,41 +256,60 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             }
 
             try {
+                //目前有正在连接远程地址的 ChannelPromise ，则直接抛出异常，禁止同时发起多个连接。
                 if (connectPromise != null) {
                     // Already a connect in process.
                     throw new ConnectionPendingException();
                 }
 
+                //记录 Channel 是否激活
                 boolean wasActive = isActive();
+                //执行连接远程地址
                 if (doConnect(remoteAddress, localAddress)) {
+                    //若连接成功
                     fulfillConnectPromise(promise, wasActive);
+                    //连接不成功, 则执行 else
                 } else {
+                    //记录 connectPromise
                     connectPromise = promise;
+                    //记录 requestedRemoteAddress
                     requestedRemoteAddress = remoteAddress;
 
+                    //使用 EventLoop 发起定时任务，监听连接远程地址超时。若连接超时，则回调通知 connectPromise 超时异常。
                     // Schedule connect timeout.
+                    //默认 30000 毫秒
                     int connectTimeoutMillis = config().getConnectTimeoutMillis();
+                    //如果有超时时间
                     if (connectTimeoutMillis > 0) {
+                        //添加定时调度任务
                         connectTimeoutFuture = eventLoop().schedule(new Runnable() {
                             @Override
                             public void run() {
+                                //获取正在连接的异步结果
                                 ChannelPromise connectPromise = AbstractNioChannel.this.connectPromise;
+                                //创建一个异常
                                 ConnectTimeoutException cause =
                                         new ConnectTimeoutException("connection timed out: " + remoteAddress);
+                                //如果尝试设置异常失败
                                 if (connectPromise != null && connectPromise.tryFailure(cause)) {
+                                    //关闭
                                     close(voidPromise());
                                 }
                             }
                         }, connectTimeoutMillis, TimeUnit.MILLISECONDS);
                     }
 
+                    //添加监听器
                     promise.addListener(new ChannelFutureListener() {
                         @Override
                         public void operationComplete(ChannelFuture future) throws Exception {
+                            //如果监听远程地址取消
                             if (future.isCancelled()) {
+                                //取消定时任务
                                 if (connectTimeoutFuture != null) {
                                     connectTimeoutFuture.cancel(false);
                                 }
+                                //置空 connectPromise
                                 connectPromise = null;
                                 close(voidPromise());
                             }
@@ -294,66 +317,92 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                     });
                 }
             } catch (Throwable t) {
+                //回调通知 promise 发生异常
                 promise.tryFailure(annotateConnectException(t, remoteAddress));
                 closeIfClosed();
             }
         }
 
+        /**
+         * 通知 Promise 连接成功完成
+         */
         private void fulfillConnectPromise(ChannelPromise promise, boolean wasActive) {
+            //如果 promise 为 null , 直接返回
             if (promise == null) {
                 // Closed via cancellation and the promise has been notified already.
                 return;
             }
 
+            //记录 Channel 是否 Active
             // Get the state as trySuccess() may trigger an ChannelFutureListener that will close the Channel.
             // We still need to ensure we call fireChannelActive() in this case.
             boolean active = isActive();
 
+            //尝试设置异步结果为成功
             // trySuccess() will return false if a user cancelled the connection attempt.
             boolean promiseSet = promise.trySuccess();
 
+            //如果是首次激活, 则触发 channelActive
             // Regardless if the connection attempt was cancelled, channelActive() event should be triggered,
             // because what happened is what happened.
             if (!wasActive && active) {
                 pipeline().fireChannelActive();
             }
 
+            //如果不成功, 则关闭
             // If a user cancelled the connection attempt, close the channel, which is followed by channelInactive().
             if (!promiseSet) {
                 close(voidPromise());
             }
         }
 
+        /**
+         * 通知 Promise 连接失败
+         */
         private void fulfillConnectPromise(ChannelPromise promise, Throwable cause) {
+            //如果 promise 为 null, 则不处理
             if (promise == null) {
                 // Closed via cancellation and the promise has been notified already.
                 return;
             }
 
+            //设置异步结果回调异常
             // Use tryFailure() instead of setFailure() to avoid the race against cancel().
             promise.tryFailure(cause);
+            //关闭
             closeIfClosed();
         }
 
+        /**
+         * 完成连接
+         */
         @Override
         public final void finishConnect() {
             // Note this method is invoked by the event loop only if the connection attempt was
             // neither cancelled nor timed out.
 
+            //判断当前线程在 EventLoop 中
             assert eventLoop().inEventLoop();
 
             try {
+                //记录当前 Channel 是否激活
                 boolean wasActive = isActive();
+                //执行完成连接
                 doFinishConnect();
+                //通知 connectPromise 连接成功
                 fulfillConnectPromise(connectPromise, wasActive);
             } catch (Throwable t) {
+                //通知 Promise 连接异常
                 fulfillConnectPromise(connectPromise, annotateConnectException(t, requestedRemoteAddress));
             } finally {
+                //如果定时任务的异步结果不为 null
                 // Check for null as the connectTimeoutFuture is only created if a connectTimeoutMillis > 0 is used
                 // See https://github.com/netty/netty/issues/1770
                 if (connectTimeoutFuture != null) {
+                    //取消执行
                     connectTimeoutFuture.cancel(false);
                 }
+                //重置为 null
                 connectPromise = null;
             }
         }
@@ -444,6 +493,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     }
 
     /**
+     * 执行连接, 返回是否连接成功
      * Connect to the remote peer
      */
     protected abstract boolean doConnect(SocketAddress remoteAddress, SocketAddress localAddress) throws Exception;

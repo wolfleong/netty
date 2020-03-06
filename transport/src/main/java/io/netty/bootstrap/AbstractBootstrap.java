@@ -425,7 +425,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             final ChannelFuture regFuture, final Channel channel,
             final SocketAddress localAddress, final ChannelPromise promise) {
 
-        //往 Channel 绑定的 EventLoop 中提交一个任务
+        //往 Channel 绑定的 EventLoop 中提交一个任务 todo wolfleong 不明白这句英文的意思, 也就是这里为什么要用 eventLoop().execute 来执行
         // This method is invoked before channelRegistered() is triggered.  Give user handlers a chance to set up
         // the pipeline in its channelRegistered() implementation.
         channel.eventLoop().execute(new Runnable() {

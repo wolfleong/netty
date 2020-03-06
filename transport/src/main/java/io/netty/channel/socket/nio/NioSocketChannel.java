@@ -56,8 +56,14 @@ import static io.netty.channel.internal.ChannelUtils.MAX_BYTES_PER_GATHERING_WRI
  */
 public class NioSocketChannel extends AbstractNioByteChannel implements io.netty.channel.socket.SocketChannel {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioSocketChannel.class);
+    /**
+     * 默认的 SelectorProvider
+     */
     private static final SelectorProvider DEFAULT_SELECTOR_PROVIDER = SelectorProvider.provider();
 
+    /**
+     * 创建 java.nio 原生的客户端 SocketChannel
+     */
     private static SocketChannel newSocket(SelectorProvider provider) {
         try {
             /**
@@ -102,7 +108,9 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
      * @param socket    the {@link SocketChannel} which will be used
      */
     public NioSocketChannel(Channel parent, SocketChannel socket) {
+        //调用父类构造方法
         super(parent, socket);
+        //创建 NioSocketChannelConfig
         config = new NioSocketChannelConfig(this, socket.socket());
     }
 
@@ -306,19 +314,27 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
 
     @Override
     protected boolean doConnect(SocketAddress remoteAddress, SocketAddress localAddress) throws Exception {
+        //绑定本地地址
         if (localAddress != null) {
+            //一般是不需要绑定本地地址的, 系统会随机分配一个
             doBind0(localAddress);
         }
 
+        //是否执行完成
         boolean success = false;
         try {
+            //连接远程地址, 这个是异步的, 立即返回
             boolean connected = SocketUtils.connect(javaChannel(), remoteAddress);
+            //若未连接完成, 则关注连接 OP_ACCEPT 事件
             if (!connected) {
                 selectionKey().interestOps(SelectionKey.OP_CONNECT);
             }
+            //标记执行是否成功
             success = true;
+            //返回连接是否完成
             return connected;
         } finally {
+            //如果执行失败, 则关闭 Channel
             if (!success) {
                 doClose();
             }

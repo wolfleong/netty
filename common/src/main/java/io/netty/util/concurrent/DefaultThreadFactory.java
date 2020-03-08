@@ -24,16 +24,32 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
+ * 默认的线程工厂实现, 主要计算通用的线程名称和一些参数配置
  * A {@link ThreadFactory} implementation with a simple naming rule.
  */
 public class DefaultThreadFactory implements ThreadFactory {
 
     private static final AtomicInteger poolId = new AtomicInteger();
 
+    /**
+     * 线程序号
+     */
     private final AtomicInteger nextId = new AtomicInteger();
+    /**
+     * 名称前缀
+     */
     private final String prefix;
+    /**
+     * 是否为守护线程
+     */
     private final boolean daemon;
+    /**
+     * 线程优先级
+     */
     private final int priority;
+    /**
+     * 线程组
+     */
     protected final ThreadGroup threadGroup;
 
     public DefaultThreadFactory(Class<?> poolType) {
@@ -64,9 +80,14 @@ public class DefaultThreadFactory implements ThreadFactory {
         this(toPoolName(poolType), daemon, priority);
     }
 
+    /**
+     * 根据池的类型, 生成线程名称模板
+     */
     public static String toPoolName(Class<?> poolType) {
+        //保证类型不为 null
         ObjectUtil.checkNotNull(poolType, "poolType");
 
+        //获取简单类名
         String poolName = StringUtil.simpleClassName(poolType);
         switch (poolName.length()) {
             case 0:
@@ -83,13 +104,16 @@ public class DefaultThreadFactory implements ThreadFactory {
     }
 
     public DefaultThreadFactory(String poolName, boolean daemon, int priority, ThreadGroup threadGroup) {
+        //校验线程池名称
         ObjectUtil.checkNotNull(poolName, "poolName");
 
+        //校验线程优先级
         if (priority < Thread.MIN_PRIORITY || priority > Thread.MAX_PRIORITY) {
             throw new IllegalArgumentException(
                     "priority: " + priority + " (expected: Thread.MIN_PRIORITY <= priority <= Thread.MAX_PRIORITY)");
         }
 
+        //线程池前缀拼接
         prefix = poolName + '-' + poolId.incrementAndGet() + '-';
         this.daemon = daemon;
         this.priority = priority;
@@ -118,6 +142,9 @@ public class DefaultThreadFactory implements ThreadFactory {
         return t;
     }
 
+    /**
+     * 创建一个线程
+     */
     protected Thread newThread(Runnable r, String name) {
         return new FastThreadLocalThread(threadGroup, r, name);
     }

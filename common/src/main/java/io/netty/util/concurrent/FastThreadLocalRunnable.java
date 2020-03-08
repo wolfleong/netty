@@ -17,6 +17,9 @@ package io.netty.util.concurrent;
 
 import io.netty.util.internal.ObjectUtil;
 
+/**
+ * 对 Runnable 进行的 Run 进行简单的包装(装饰), 主要的区别是多了删除操作
+ */
 final class FastThreadLocalRunnable implements Runnable {
     private final Runnable runnable;
 
@@ -29,11 +32,13 @@ final class FastThreadLocalRunnable implements Runnable {
         try {
             runnable.run();
         } finally {
+            //删除当前线程绑定的全部变量, 这里保证了不会内存溢出
             FastThreadLocal.removeAll();
         }
     }
 
     static Runnable wrap(Runnable runnable) {
+        //用 FastThreadLocalRunnable 对普通的 Runnable 进行包装
         return runnable instanceof FastThreadLocalRunnable ? runnable : new FastThreadLocalRunnable(runnable);
     }
 }

@@ -32,11 +32,25 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 class UnpaddedInternalThreadLocalMap {
 
+    /**
+     * 对非FastThreadLocalThread线程做兼容，如果在`Thread`中使用`FastThreadLocal`，则实际上使用`ThreadLocal`存放资源
+     */
     static final ThreadLocal<InternalThreadLocalMap> slowThreadLocalMap = new ThreadLocal<InternalThreadLocalMap>();
+    /**
+     * 资源索引，每一个FastThreadLocal对象都会有对应的ID，即通过nextIndex自增得到
+     */
     static final AtomicInteger nextIndex = new AtomicInteger();
 
+    /**
+     * - FastThreadLocal的资源存放地址，ThreadLocal中是通过ThreadLocalMap存放资源，索引是ThreadLocal对象的threadLocalHashCode进行hash得到
+     * - FastThreadLocal使用Object[]数组，使用通过nextIndex自增得到的数值作为索引，保证每次查询数值都是O(1)操作
+     * - 需要注意，FastThreadLocal对象为了避免伪共享带来的性能损耗，使用padding使得FastThreadLocal的对象大小超过128byte
+     * - 避免伪共享的情况下，indexedVariables的多个连续数值在不更新的前提下可以被缓存至cpu chache line中，这样大大的提高了查询效率
+     */
     /** Used by {@link FastThreadLocal} */
     Object[] indexedVariables;
+
+    //下面这些变量方便 Netty 其他 API 用的, 与 FastThreadLocal 无关
 
     // Core thread-locals
     int futureListenerStackDepth;

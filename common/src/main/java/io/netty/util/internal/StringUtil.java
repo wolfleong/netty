@@ -300,6 +300,7 @@ public final class StringUtil {
     }
 
     /**
+     * 与 Class.getSimpleName() 类似, 但是他更好地与匿名类一起工作
      * Generates a simplified name from a {@link Class}.  Similar to {@link Class#getSimpleName()}, but it works fine
      * with anonymous classes.
      */

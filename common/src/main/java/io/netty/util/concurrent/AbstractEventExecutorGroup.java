@@ -27,6 +27,8 @@ import static io.netty.util.concurrent.AbstractEventExecutor.*;
 
 
 /**
+ * 实现 EventExecutorGroup 接口的基础抽象类,
+ * - 主要做的一些通用的封装, 如: 将执行任务的方法, 全部是通过 next() 来获取 EventExecutor , 然后再用 EventExecutor 的具体方法来进行操作
  * Abstract base class for {@link EventExecutorGroup} implementations.
  */
 public abstract class AbstractEventExecutorGroup implements EventExecutorGroup {

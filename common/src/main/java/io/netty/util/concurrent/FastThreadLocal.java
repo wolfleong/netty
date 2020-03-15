@@ -28,7 +28,7 @@ import java.util.Set;
  *  - FastThreadLocal利用字节填充来解决伪共享问题
  *  - FastThreadLocal利用 FastThreadLocalRunnable 解决可能的内存泄漏问题
  *
- * 缺点:
+ * FastThreadLocal 缺点:
  * - 空间换时间, 数组长度随着 index 的增长而增长
  * - 必须使用 FastThreadLocalThread 性能才好
  * A special variant of {@link ThreadLocal} that yields higher access performance when accessed from a

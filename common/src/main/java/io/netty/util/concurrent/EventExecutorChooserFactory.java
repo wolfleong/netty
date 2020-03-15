@@ -25,6 +25,7 @@ import io.netty.util.internal.UnstableApi;
 public interface EventExecutorChooserFactory {
 
     /**
+     * 创建一个 EventExecutorChooser 实例
      * Returns a new {@link EventExecutorChooser}.
      */
     EventExecutorChooser newChooser(EventExecutor[] executors);

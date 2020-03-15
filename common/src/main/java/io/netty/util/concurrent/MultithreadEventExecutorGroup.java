@@ -96,29 +96,42 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
 
+        //创建 EventExecutor 数组
         children = new EventExecutor[nThreads];
 
+        //按指定线程数遍历
         for (int i = 0; i < nThreads; i ++) {
+            //标记是否创建成功
             boolean success = false;
             try {
+                //调用 newChild 方法, 创建 EventExecutor 对象
                 children[i] = newChild(executor, args);
+                //标记创建成功
                 success = true;
             } catch (Exception e) {
+                //如果创建失败, 抛出异常
                 // TODO: Think about if this is a good exception type
                 throw new IllegalStateException("failed to create a child event loop", e);
             } finally {
+                //如果有不成功
                 if (!success) {
+                    //遍历之前所创建的 EventExecutor
                     for (int j = 0; j < i; j ++) {
+                        //逐个关闭
                         children[j].shutdownGracefully();
                     }
 
+                    //确保所有已经创建的 EventExecutor 已经关闭
                     for (int j = 0; j < i; j ++) {
                         EventExecutor e = children[j];
                         try {
+                            //判断 EventExecutor 是否已经完全停止, 关闭和完全停止是两种状态
                             while (!e.isTerminated()) {
+                                //如果没有完全停止, 则等待
                                 e.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
                             }
                         } catch (InterruptedException interrupted) {
+                            //如果有中断, 则设置线程中断状态
                             // Let the caller handle the interruption.
                             Thread.currentThread().interrupt();
                             break;
@@ -128,32 +141,42 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             }
         }
 
+        //创建一个 EventExecutor 选择器
         chooser = chooserFactory.newChooser(children);
 
+        //创建一个监听器对象, 用于 EventExecutor 终止时的监听
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {
             @Override
             public void operationComplete(Future<Object> future) throws Exception {
+                //如果已经终止 EventExecutor 的数量 等于
                 if (terminatedChildren.incrementAndGet() == children.length) {
+                    //如果完全终止, 则设置终止异步结果成功
                     terminationFuture.setSuccess(null);
                 }
             }
         };
 
+        //设置监听器到每个 EventExecutor 上
         for (EventExecutor e: children) {
             e.terminationFuture().addListener(terminationListener);
         }
 
+        //创建不可变的 EventExecutor 数组, 缓存起来
         Set<EventExecutor> childrenSet = new LinkedHashSet<EventExecutor>(children.length);
         Collections.addAll(childrenSet, children);
         readonlyChildren = Collections.unmodifiableSet(childrenSet);
     }
 
+    /**
+     * 创建默认的线程工厂
+     */
     protected ThreadFactory newDefaultThreadFactory() {
         return new DefaultThreadFactory(getClass());
     }
 
     @Override
     public EventExecutor next() {
+        //用选择器选择下一个 EventExecutor
         return chooser.next();
     }
 
@@ -163,6 +186,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
     }
 
     /**
+     * 返回 EventExecutor 的个数
      * Return the number of {@link EventExecutor} this implementation uses. This number is the maps
      * 1:1 to the threads it use.
      */
@@ -171,6 +195,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
     }
 
     /**
+     * 抽像方法, 创建对应 EventExecutor 的实现类
      * Create a new EventExecutor which will later then accessible via the {@link #next()}  method. This method will be
      * called for each thread that will serve this {@link MultithreadEventExecutorGroup}.
      *
@@ -179,7 +204,9 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
 
     @Override
     public Future<?> shutdownGracefully(long quietPeriod, long timeout, TimeUnit unit) {
+        //遍历 EventExecutor
         for (EventExecutor l: children) {
+            //逐个优雅关闭
             l.shutdownGracefully(quietPeriod, timeout, unit);
         }
         return terminationFuture();

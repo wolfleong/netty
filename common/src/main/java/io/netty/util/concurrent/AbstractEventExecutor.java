@@ -29,6 +29,7 @@ import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * EventExecutor 的基础类
  * Abstract base class for {@link EventExecutor} implementations.
  */
 public abstract class AbstractEventExecutor extends AbstractExecutorService implements EventExecutor {
@@ -37,7 +38,13 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
     static final long DEFAULT_SHUTDOWN_QUIET_PERIOD = 2;
     static final long DEFAULT_SHUTDOWN_TIMEOUT = 15;
 
+    /**
+     * 所属的 EventExecutorGroup
+     */
     private final EventExecutorGroup parent;
+    /**
+     * EventExecutor 数组, 只包含自己, 用于返回迭代器
+     */
     private final Collection<EventExecutor> selfCollection = Collections.<EventExecutor>singleton(this);
 
     protected AbstractEventExecutor() {
@@ -55,6 +62,7 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
 
     @Override
     public EventExecutor next() {
+        //返回当前对象
         return this;
     }
 
@@ -65,6 +73,7 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
 
     @Override
     public Iterator<EventExecutor> iterator() {
+        //返回迭代器
         return selfCollection.iterator();
     }
 
@@ -92,21 +101,25 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
 
     @Override
     public <V> Promise<V> newPromise() {
+        //创建 DefaultPromise 返回
         return new DefaultPromise<V>(this);
     }
 
     @Override
     public <V> ProgressivePromise<V> newProgressivePromise() {
+        // 创建 DefaultProgressivePromise 返回
         return new DefaultProgressivePromise<V>(this);
     }
 
     @Override
     public <V> Future<V> newSucceededFuture(V result) {
+        //创建 SucceededFuture 返回
         return new SucceededFuture<V>(this, result);
     }
 
     @Override
     public <V> Future<V> newFailedFuture(Throwable cause) {
+        //创建 FailedFuture 返回
         return new FailedFuture<V>(this, cause);
     }
 
@@ -125,13 +138,22 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
         return (Future<T>) super.submit(task);
     }
 
+    /**
+     * 覆盖父类的方法
+     * - 上面 submit 的方法都是基于 newTaskFor 方法来执行的
+     */
     @Override
     protected final <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
+        //创建 PromiseTask
         return new PromiseTask<T>(this, runnable, value);
     }
 
+    /**
+     * 覆盖父类的方法
+     */
     @Override
     protected final <T> RunnableFuture<T> newTaskFor(Callable<T> callable) {
+        //创建 PromiseTask
         return new PromiseTask<T>(this, callable);
     }
 
@@ -157,6 +179,7 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
     }
 
     /**
+     * 安全地执行 Task , 主要是 catch 异常了
      * Try to execute the given {@link Runnable} and just log if it throws a {@link Throwable}.
      */
     protected static void safeExecute(Runnable task) {

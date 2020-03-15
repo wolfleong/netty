@@ -127,12 +127,15 @@ public class DefaultThreadFactory implements ThreadFactory {
 
     @Override
     public Thread newThread(Runnable r) {
+        //用 FastThreadLocalRunnable 包装 Runnable , 并且线程名称和id
         Thread t = newThread(FastThreadLocalRunnable.wrap(r), prefix + nextId.incrementAndGet());
         try {
+            //设置是否守护线程
             if (t.isDaemon() != daemon) {
                 t.setDaemon(daemon);
             }
 
+            //设置优先级
             if (t.getPriority() != priority) {
                 t.setPriority(priority);
             }
@@ -143,7 +146,7 @@ public class DefaultThreadFactory implements ThreadFactory {
     }
 
     /**
-     * 创建一个线程
+     * 创建一个线程, 主要是用 FastThreadLocalThread 创建
      */
     protected Thread newThread(Runnable r, String name) {
         return new FastThreadLocalThread(threadGroup, r, name);

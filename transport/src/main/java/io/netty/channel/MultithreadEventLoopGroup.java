@@ -27,6 +27,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
 /**
+ * 实现 EventLoopGroup 接口，继承 MultithreadEventExecutorGroup 抽象类，基于多线程的 EventLoop 的分组抽象类。
  * Abstract base class for {@link EventLoopGroup} implementations that handles their tasks with multiple threads at
  * the same time.
  */
@@ -34,9 +35,14 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(MultithreadEventLoopGroup.class);
 
+    /**
+     * 默认 EventLoop 的数量, 也就是线程数, 一个 EventLoop 代表一个线程
+     */
     private static final int DEFAULT_EVENT_LOOP_THREADS;
 
     static {
+        //默认是 CPU * 2
+        //为什么会 * 2 呢？因为目前 CPU 基本都是超线程，一个 CPU 可对应 2 个线程。
         DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt(
                 "io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
 
@@ -46,6 +52,7 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
     }
 
     /**
+     * 如果没有指定线程数, 则用默认的 DEFAULT_EVENT_LOOP_THREADS
      * @see MultithreadEventExecutorGroup#MultithreadEventExecutorGroup(int, Executor, Object...)
      */
     protected MultithreadEventLoopGroup(int nThreads, Executor executor, Object... args) {
@@ -68,11 +75,17 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
         super(nThreads == 0 ? DEFAULT_EVENT_LOOP_THREADS : nThreads, executor, chooserFactory, args);
     }
 
+    /**
+     * 创建默认的线程工厂, 用的是最大的线程优先级
+     */
     @Override
     protected ThreadFactory newDefaultThreadFactory() {
         return new DefaultThreadFactory(getClass(), Thread.MAX_PRIORITY);
     }
 
+    /**
+     * 获取一个 EventLoop
+     */
     @Override
     public EventLoop next() {
         return (EventLoop) super.next();
@@ -81,11 +94,17 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
     @Override
     protected abstract EventLoop newChild(Executor executor, Object... args) throws Exception;
 
+    /**
+     * 注册 Channel , 实际上是分配一个 EventLoop 给 Channel 来注册
+     */
     @Override
     public ChannelFuture register(Channel channel) {
         return next().register(channel);
     }
 
+    /**
+     * 注册 ChannelPromise , 实际上是分配一个 EventLoop 给 ChannelPromise 来注册
+     */
     @Override
     public ChannelFuture register(ChannelPromise promise) {
         return next().register(promise);

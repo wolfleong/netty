@@ -73,6 +73,11 @@ public final class DefaultEventExecutorChooserFactory implements EventExecutorCh
             this.executors = executors;
         }
 
+        /**
+         * 实现比较巧妙，通过 idx 自增，并使用【EventExecutor 数组的大小 - 1】进行进行 & 并操作。
+         * 因为 - ( 二元操作符 ) 的计算优先级高于 & ( 一元操作符 ) 。
+         * 因为 EventExecutor 数组的大小是以 2 为幂次方的数字，那么减一后，除了最高位是 0 ，剩余位都为 1 ( 例如 8 减一后等于 7 ，而 7 的二进制为 0111 。)，那么无论 idx 无论如何递增，再进行 & 并操作，都不会超过 EventExecutor 数组的大小。并且，还能保证顺序递增。
+         */
         @Override
         public EventExecutor next() {
             //增长索引按数据长度减1, 按位(&)运算, 这样做性能更高

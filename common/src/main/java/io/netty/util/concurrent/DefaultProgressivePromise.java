@@ -16,6 +16,10 @@
 
 package io.netty.util.concurrent;
 
+/**
+ * ProgressivePromise 接口的默认实现
+ *  - 与 DefaultPromise 区别是, 设置进度条时会通知进度条监听器
+ */
 public class DefaultProgressivePromise<V> extends DefaultPromise<V> implements ProgressivePromise<V> {
 
     /**
@@ -34,6 +38,7 @@ public class DefaultProgressivePromise<V> extends DefaultPromise<V> implements P
 
     @Override
     public ProgressivePromise<V> setProgress(long progress, long total) {
+        //校验参数
         if (total < 0) {
             // total unknown
             total = -1; // normalize
@@ -44,17 +49,19 @@ public class DefaultProgressivePromise<V> extends DefaultPromise<V> implements P
             throw new IllegalArgumentException(
                     "progress: " + progress + " (expected: 0 <= progress <= total (" + total + "))");
         }
-
+        //如果已经完成, 则不能操作
         if (isDone()) {
             throw new IllegalStateException("complete already");
         }
 
+        //通知 Listeners
         notifyProgressiveListeners(progress, total);
         return this;
     }
 
     @Override
     public boolean tryProgress(long progress, long total) {
+        //校验不通过, 则返回 false
         if (total < 0) {
             total = -1;
             if (progress < 0 || isDone()) {
@@ -64,6 +71,7 @@ public class DefaultProgressivePromise<V> extends DefaultPromise<V> implements P
             return false;
         }
 
+        //通知
         notifyProgressiveListeners(progress, total);
         return true;
     }

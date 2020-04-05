@@ -74,7 +74,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
      */
     private volatile Object result;
     /**
-     * 事件执行器, 有可能为 null
+     * 事件执行器, 有可能为 null, 主要是用来执行监听器的回调
      */
     private final EventExecutor executor;
     /**
@@ -449,6 +449,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
      */
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
+        //如果取消了, 则会设置一个取消异常
         if (RESULT_UPDATER.compareAndSet(this, null, CANCELLATION_CAUSE_HOLDER)) {
             if (checkNotifyWaiters()) {
                 notifyListeners();
@@ -460,6 +461,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
 
     @Override
     public boolean isCancelled() {
+        //判断是否已经取消
         return isCancelled0(result);
     }
 
@@ -843,23 +845,31 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
      */
     @SuppressWarnings("unchecked")
     void notifyProgressiveListeners(final long progress, final long total) {
+        //获取所有进度类型的监听器
         final Object listeners = progressiveListeners();
+        //没有则不处理
         if (listeners == null) {
             return;
         }
 
+        //强转为子类
         final ProgressiveFuture<V> self = (ProgressiveFuture<V>) this;
 
+        //获取 EventExecutor
         EventExecutor executor = executor();
+        //如果当前线程在 EventLoop 中
         if (executor.inEventLoop()) {
+            //执行多个监听器
             if (listeners instanceof GenericProgressiveFutureListener[]) {
                 notifyProgressiveListeners0(
                         self, (GenericProgressiveFutureListener<?>[]) listeners, progress, total);
             } else {
+                //执行单个监听器
                 notifyProgressiveListener0(
                         self, (GenericProgressiveFutureListener<ProgressiveFuture<V>>) listeners, progress, total);
             }
         } else {
+            //执行多个监听器
             if (listeners instanceof GenericProgressiveFutureListener[]) {
                 final GenericProgressiveFutureListener<?>[] array =
                         (GenericProgressiveFutureListener<?>[]) listeners;
@@ -870,6 +880,7 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
                     }
                 });
             } else {
+                //执行单个监听器
                 final GenericProgressiveFutureListener<ProgressiveFuture<V>> l =
                         (GenericProgressiveFutureListener<ProgressiveFuture<V>>) listeners;
                 safeExecute(executor, new Runnable() {
@@ -883,42 +894,57 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
     }
 
     /**
+     * 获取所有 GenericProgressiveFutureListener 类型的监听器
      * Returns a {@link GenericProgressiveFutureListener}, an array of {@link GenericProgressiveFutureListener}, or
      * {@code null}.
      */
     private synchronized Object progressiveListeners() {
+        //获取列表对象
         Object listeners = this.listeners;
+        //没有监听器, 返回 null
         if (listeners == null) {
             // No listeners added
             return null;
         }
 
+        //如果是列表类型
         if (listeners instanceof DefaultFutureListeners) {
+            //强转
             // Copy DefaultFutureListeners into an array of listeners.
             DefaultFutureListeners dfl = (DefaultFutureListeners) listeners;
+            //获取 GenericProgressiveFutureListener 类型的个数
             int progressiveSize = dfl.progressiveSize();
             switch (progressiveSize) {
                 case 0:
+                    //没有 GenericProgressiveFutureListener 类型的监听器, 返回 null
                     return null;
                 case 1:
+                    //如果只有一个, 遍历到就直接返回
                     for (GenericFutureListener<?> l: dfl.listeners()) {
                         if (l instanceof GenericProgressiveFutureListener) {
                             return l;
                         }
                     }
+                    //没有则返回 null
                     return null;
             }
 
+            //有多个
             GenericFutureListener<?>[] array = dfl.listeners();
+            //创建 GenericProgressiveFutureListener 数组
             GenericProgressiveFutureListener<?>[] copy = new GenericProgressiveFutureListener[progressiveSize];
+            //迭代, 这里的 i 是不会数组越界的, 因为 j 是确定存在的
             for (int i = 0, j = 0; j < progressiveSize; i ++) {
                 GenericFutureListener<?> l = array[i];
+                //如果是 GenericProgressiveFutureListener 则添加到数组
                 if (l instanceof GenericProgressiveFutureListener) {
                     copy[j ++] = (GenericProgressiveFutureListener<?>) l;
                 }
             }
 
+            //返回多个
             return copy;
+            //只有一个 GenericProgressiveFutureListener , 则直接返回
         } else if (listeners instanceof GenericProgressiveFutureListener) {
             return listeners;
         } else {

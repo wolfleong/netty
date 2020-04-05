@@ -39,6 +39,9 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
                 }
             };
 
+    /**
+     * 这是一个空的 Runnable 实现类。仅仅用于唤醒基于 taskQueue 阻塞拉取的 EventLoop 实现类
+     */
    static final Runnable WAKEUP_TASK = new Runnable() {
        @Override
        public void run() { } // Do nothing

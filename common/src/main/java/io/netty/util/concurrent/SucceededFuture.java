@@ -16,6 +16,7 @@
 package io.netty.util.concurrent;
 
 /**
+ * 成功的 Future
  * The {@link CompleteFuture} which is succeeded already.  It is
  * recommended to use {@link EventExecutor#newSucceededFuture(Object)} instead of
  * calling the constructor of this future.

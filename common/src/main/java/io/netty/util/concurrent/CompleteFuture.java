@@ -21,10 +21,16 @@ import io.netty.util.internal.ObjectUtil;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * CompleteFuture 已经完成的 Future , 相当于已知结果的 Future
+ *  - 如果添加监听器, 则立即通知
+ *  - 其他方法根据状态处理
  * A skeletal {@link Future} implementation which represents a {@link Future} which has been completed already.
  */
 public abstract class CompleteFuture<V> extends AbstractFuture<V> {
 
+    /**
+     * 执行器
+     */
     private final EventExecutor executor;
 
     /**
@@ -45,12 +51,14 @@ public abstract class CompleteFuture<V> extends AbstractFuture<V> {
 
     @Override
     public Future<V> addListener(GenericFutureListener<? extends Future<? super V>> listener) {
+        //通知
         DefaultPromise.notifyListener(executor(), this, ObjectUtil.checkNotNull(listener, "listener"));
         return this;
     }
 
     @Override
     public Future<V> addListeners(GenericFutureListener<? extends Future<? super V>>... listeners) {
+        //遍历通知
         for (GenericFutureListener<? extends Future<? super V>> l:
                 ObjectUtil.checkNotNull(listeners, "listeners")) {
 

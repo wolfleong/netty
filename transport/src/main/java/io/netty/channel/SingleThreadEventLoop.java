@@ -27,14 +27,23 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
 /**
+ * 实现 EventLoop 接口，继承 SingleThreadEventExecutor 抽象类，基于单线程的 EventLoop 抽象类，
+ * 主要增加了 Channel 注册到 EventLoop 上。
+ *
  * Abstract base class for {@link EventLoop}s that execute all its submitted tasks in a single thread.
  *
  */
 public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor implements EventLoop {
 
+    /**
+     * 默认任务队列最大数量
+     */
     protected static final int DEFAULT_MAX_PENDING_TASKS = Math.max(16,
             SystemPropertyUtil.getInt("io.netty.eventLoop.maxPendingTasks", Integer.MAX_VALUE));
 
+    /**
+     * 尾部任务队列，执行在 taskQueue 之后
+     */
     private final Queue<Runnable> tailTasks;
 
     protected SingleThreadEventLoop(EventLoopGroup parent, ThreadFactory threadFactory, boolean addTaskWakesUp) {
@@ -56,6 +65,7 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
                                     boolean addTaskWakesUp, int maxPendingTasks,
                                     RejectedExecutionHandler rejectedExecutionHandler) {
         super(parent, executor, addTaskWakesUp, maxPendingTasks, rejectedExecutionHandler);
+        //创建队列
         tailTasks = newTaskQueue(maxPendingTasks);
     }
 
@@ -68,14 +78,19 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
 
     @Override
     public EventLoopGroup parent() {
+        //覆盖父类方法，将返回值转换成 EventLoopGroup 类。
         return (EventLoopGroup) super.parent();
     }
 
     @Override
     public EventLoop next() {
+        //获得自己
         return (EventLoop) super.next();
     }
 
+    /**
+     * 注册 Channel 到 EventLoop 上
+     */
     @Override
     public ChannelFuture register(Channel channel) {
         //创建 DefaultChannelPromise , 并调用 register(final ChannelPromise promise)
@@ -87,6 +102,7 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
         ObjectUtil.checkNotNull(promise, "promise");
         //调用 Channel 的 Unsafe 的 register 方法进行注册
         promise.channel().unsafe().register(this, promise);
+        // 返回 ChannelPromise 对象
         return promise;
     }
 
@@ -107,20 +123,25 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
     @UnstableApi
     public final void executeAfterEventLoopIteration(Runnable task) {
         ObjectUtil.checkNotNull(task, "task");
+        // 关闭时，拒绝任务
         if (isShutdown()) {
             reject();
         }
 
+        //// 添加到任务队列
         if (!tailTasks.offer(task)) {
             reject(task);
         }
 
+        // 非 LazyRunnable 类型的任务且要唤醒
         if (!(task instanceof LazyRunnable) && wakesUpForTask(task)) {
+            //唤醒
             wakeup(inEventLoop());
         }
     }
 
     /**
+     * 移除指定任务
      * Removes a task that was added previously via {@link #executeAfterEventLoopIteration(Runnable)}.
      *
      * @param task to be removed.
@@ -134,16 +155,19 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
 
     @Override
     protected void afterRunningAllTasks() {
+        //在运行完所有任务后，执行 tailTasks 队列中的任务
         runAllTasksFrom(tailTasks);
     }
 
     @Override
     protected boolean hasTasks() {
+        //基于两个队列来判断是否还有任务
         return super.hasTasks() || !tailTasks.isEmpty();
     }
 
     @Override
     public int pendingTasks() {
+        //获得队列中的任务数
         return super.pendingTasks() + tailTasks.size();
     }
 

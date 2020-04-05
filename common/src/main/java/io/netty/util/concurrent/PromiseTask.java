@@ -18,8 +18,17 @@ package io.netty.util.concurrent;
 import java.util.concurrent.Callable;
 import java.util.concurrent.RunnableFuture;
 
+/**
+ * PromiseTask 类是 DefaultPromise 类的 RunnableFuture 接口实现, 相当于适配器
+ *  - 也就是将 DefaultPromise 适配成 RunnableFuture 的一种实现
+ *  - 任务未完成前, task 是要执行的任务, 等任务处理完成后, task 是一种表示状态的占位对象
+ * @param <V>
+ */
 class PromiseTask<V> extends DefaultPromise<V> implements RunnableFuture<V> {
 
+    /**
+     * 将 Runnable 适配成 Callable 的适配器
+     */
     private static final class RunnableAdapter<T> implements Callable<T> {
         final Runnable task;
         final T result;
@@ -41,11 +50,27 @@ class PromiseTask<V> extends DefaultPromise<V> implements RunnableFuture<V> {
         }
     }
 
+    //下面三个 Runnable 用于标记 task 的状态
+    /**
+     * 已经完成
+     */
     private static final Runnable COMPLETED = new SentinelRunnable("COMPLETED");
+    /**
+     * 已经取消
+     */
     private static final Runnable CANCELLED = new SentinelRunnable("CANCELLED");
+    /**
+     * 已经失败
+     */
     private static final Runnable FAILED = new SentinelRunnable("FAILED");
 
+    /**
+     * 占位用的 Runnable , 没有逻辑
+     */
     private static class SentinelRunnable implements Runnable {
+        /**
+         * 名称
+         */
         private final String name;
 
         SentinelRunnable(String name) {
@@ -61,6 +86,7 @@ class PromiseTask<V> extends DefaultPromise<V> implements RunnableFuture<V> {
         }
     }
 
+    //真正要执行的任务对象, 有结果后, 存对应的结果状态占位符
     // Strictly of type Callable<V> or Runnable
     private Object task;
 
@@ -89,6 +115,9 @@ class PromiseTask<V> extends DefaultPromise<V> implements RunnableFuture<V> {
         return this == obj;
     }
 
+    /**
+     * 执行真正的 task
+     */
     @SuppressWarnings("unchecked")
     final V runTask() throws Exception {
         final Object task = this.task;
@@ -102,15 +131,22 @@ class PromiseTask<V> extends DefaultPromise<V> implements RunnableFuture<V> {
     @Override
     public void run() {
         try {
+            //设置不可取消
             if (setUncancellableInternal()) {
+                //执行任务
                 V result = runTask();
+                //设置成功结果
                 setSuccessInternal(result);
             }
         } catch (Throwable e) {
+            //设置失败
             setFailureInternal(e);
         }
     }
 
+    /**
+     * 用占位 Runnable 替换原来的 task
+     */
     private boolean clearTaskAfterCompletion(boolean done, Runnable result) {
         if (done) {
             // The only time where it might be possible for the sentinel task
@@ -128,7 +164,9 @@ class PromiseTask<V> extends DefaultPromise<V> implements RunnableFuture<V> {
     }
 
     protected final Promise<V> setFailureInternal(Throwable cause) {
+        //设置失败
         super.setFailure(cause);
+        //清空 task 任务
         clearTaskAfterCompletion(true, FAILED);
         return this;
     }
@@ -148,7 +186,9 @@ class PromiseTask<V> extends DefaultPromise<V> implements RunnableFuture<V> {
     }
 
     protected final Promise<V> setSuccessInternal(V result) {
+        //设置结果
         super.setSuccess(result);
+        //替换 task 为 COMPLETED
         clearTaskAfterCompletion(true, COMPLETED);
         return this;
     }
@@ -173,6 +213,7 @@ class PromiseTask<V> extends DefaultPromise<V> implements RunnableFuture<V> {
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
+        //取消任务, 并设置 task 为 CANCELLED
         return clearTaskAfterCompletion(super.cancel(mayInterruptIfRunning), CANCELLED);
     }
 

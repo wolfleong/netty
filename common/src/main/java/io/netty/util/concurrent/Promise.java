@@ -62,7 +62,7 @@ public interface Promise<V> extends Future<V> {
     boolean tryFailure(Throwable cause);
 
     /**
-     * 设置任务不可取消
+     * 设置任务不可取消, 也就是任务肯定要有结果
      * Make this future impossible to cancel.
      *
      * @return {@code true} if and only if successfully marked this future as uncancellable or it is already done

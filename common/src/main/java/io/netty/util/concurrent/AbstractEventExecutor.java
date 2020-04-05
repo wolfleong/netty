@@ -101,7 +101,7 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
 
     @Override
     public <V> Promise<V> newPromise() {
-        //创建 DefaultPromise 返回
+        //创建 DefaultPromise 返回,
         return new DefaultPromise<V>(this);
     }
 
@@ -160,26 +160,30 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
     @Override
     public ScheduledFuture<?> schedule(Runnable command, long delay,
                                        TimeUnit unit) {
+        //EventExecutor 不调度执行
         throw new UnsupportedOperationException();
     }
 
     @Override
     public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
+        //EventExecutor 不调度执行
         throw new UnsupportedOperationException();
     }
 
     @Override
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
+        //EventExecutor 不调度执行
         throw new UnsupportedOperationException();
     }
 
     @Override
     public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit) {
+        //EventExecutor 不调度执行
         throw new UnsupportedOperationException();
     }
 
     /**
-     * 安全地执行 Task , 主要是 catch 异常了
+     * 安全地执行 Task , 主要是 catch 异常了, 将异常当作警告日志打出来
      * Try to execute the given {@link Runnable} and just log if it throws a {@link Throwable}.
      */
     protected static void safeExecute(Runnable task) {

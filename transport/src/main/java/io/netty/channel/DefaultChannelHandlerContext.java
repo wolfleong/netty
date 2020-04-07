@@ -17,8 +17,14 @@ package io.netty.channel;
 
 import io.netty.util.concurrent.EventExecutor;
 
+/**
+ *  AbstractChannelHandlerContext 抽象类的默认实现
+ */
 final class DefaultChannelHandlerContext extends AbstractChannelHandlerContext {
 
+    /**
+     * 绑定的处理器
+     */
     private final ChannelHandler handler;
 
     DefaultChannelHandlerContext(

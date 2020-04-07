@@ -121,20 +121,26 @@ import java.nio.channels.Channels;
  * {@link ChannelPipeline} to find out more about inbound and outbound operations,
  * what fundamental differences they have, how they flow in a  pipeline,  and how to handle
  * the operation in your application.
+ *
+ * 继承 ChannelInboundInvoker、ChannelOutboundInvoker、AttributeMap 接口，ChannelHandlerContext( 上下文 )接口，作为 ChannelPipeline 中的节点
+ *
  */
 public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvoker, ChannelOutboundInvoker {
 
     /**
+     * 绑定的 channel
      * Return the {@link Channel} which is bound to the {@link ChannelHandlerContext}.
      */
     Channel channel();
 
     /**
+     * 执行器
      * Returns the {@link EventExecutor} which is used to execute an arbitrary task.
      */
     EventExecutor executor();
 
     /**
+     * 唯一的名称
      * The unique name of the {@link ChannelHandlerContext}.The name was used when then {@link ChannelHandler}
      * was added to the {@link ChannelPipeline}. This name can also be used to access the registered
      * {@link ChannelHandler} from the {@link ChannelPipeline}.
@@ -142,11 +148,13 @@ public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvok
     String name();
 
     /**
+     * 每个 ChannelHandlerContext 都有一个 ChannelHandler
      * The {@link ChannelHandler} that is bound this {@link ChannelHandlerContext}.
      */
     ChannelHandler handler();
 
     /**
+     * // 是否已经移除
      * Return {@code true} if the {@link ChannelHandler} which belongs to this context was removed
      * from the {@link ChannelPipeline}. Note that this method is only meant to be called from with in the
      * {@link EventLoop}.

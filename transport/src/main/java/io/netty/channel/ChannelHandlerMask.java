@@ -161,6 +161,9 @@ final class ChannelHandlerMask {
         return mask;
     }
 
+    /**
+     * 是否跳过此方法
+     */
     @SuppressWarnings("rawtypes")
     private static boolean isSkippable(
             final Class<?> handlerType, final String methodName, final Class<?>... paramTypes) throws Exception {
@@ -169,12 +172,14 @@ final class ChannelHandlerMask {
             public Boolean run() throws Exception {
                 Method m;
                 try {
+                    //根据参数和方法名, 获取 Method 对象
                     m = handlerType.getMethod(methodName, paramTypes);
                 } catch (NoSuchMethodException e) {
                     logger.debug(
                         "Class {} missing method {}, assume we can not skip execution", handlerType, methodName, e);
                     return false;
                 }
+                //如果方法上有 @Skip 注解 , 则返回 true
                 return m != null && m.isAnnotationPresent(Skip.class);
             }
         });

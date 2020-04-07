@@ -18,6 +18,7 @@ package io.netty.channel;
 import java.util.Queue;
 
 /**
+ * EventLoop 任务队列工厂接口
  * Factory used to create {@link Queue} instances that will be used to store tasks for an {@link EventLoop}.
  *
  * Generally speaking the returned {@link Queue} MUST be thread-safe and depending on the {@link EventLoop}

@@ -15,28 +15,47 @@
  */
 package io.netty.channel.nio;
 
+import sun.nio.ch.SelectorImpl;
+
 import java.nio.channels.SelectionKey;
 import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+/**
+ * 继承 AbstractSet 抽象类，已 select 的 NIO SelectionKey 集合, 用于优化 Selector.
+ *
+ * 性能优化
+ *  - 原来的 Selector 是用 HashSet 来实现的, 可以看 {@link SelectorImpl} 的实现
+ *  - 直接数组实现的 Set 比 HashMap 的性能好
+ */
 final class SelectedSelectionKeySet extends AbstractSet<SelectionKey> {
 
+    /**
+     * SelectionKey 数组
+     */
     SelectionKey[] keys;
+    /**
+     * SelectKey 的个数
+     */
     int size;
 
     SelectedSelectionKeySet() {
+        // 默认 1024 大小
         keys = new SelectionKey[1024];
     }
 
     @Override
     public boolean add(SelectionKey o) {
+        //元素为 null 则返回 false
         if (o == null) {
             return false;
         }
 
+        // 添加到数组
         keys[size++] = o;
+        //容量不够, 扩容来凑
         if (size == keys.length) {
             increaseCapacity();
         }
@@ -46,11 +65,13 @@ final class SelectedSelectionKeySet extends AbstractSet<SelectionKey> {
 
     @Override
     public boolean remove(Object o) {
+        //不能删除
         return false;
     }
 
     @Override
     public boolean contains(Object o) {
+        //不能查询是否包含
         return false;
     }
 
@@ -85,15 +106,23 @@ final class SelectedSelectionKeySet extends AbstractSet<SelectionKey> {
     }
 
     void reset() {
+        //全部重置
         reset(0);
     }
 
+    /**
+     * 从指定索引 start 开始, 重置 size 个元素为 null
+     */
     void reset(int start) {
         Arrays.fill(keys, start, size, null);
         size = 0;
     }
 
+    /**
+     * 扩容
+     */
     private void increaseCapacity() {
+        //容量变成原来的 2 倍
         SelectionKey[] newKeys = new SelectionKey[keys.length << 1];
         System.arraycopy(keys, 0, newKeys, 0, size);
         keys = newKeys;

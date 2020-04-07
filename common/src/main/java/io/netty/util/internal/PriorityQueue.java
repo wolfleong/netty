@@ -17,18 +17,24 @@ package io.netty.util.internal;
 
 import java.util.Queue;
 
+/**
+ * 优先级队列接口
+ */
 public interface PriorityQueue<T> extends Queue<T> {
     /**
+     * 删除
      * Same as {@link #remove(Object)} but typed using generics.
      */
     boolean removeTyped(T node);
 
     /**
+     * 是否包含
      * Same as {@link #contains(Object)} but typed using generics.
      */
     boolean containsTyped(T node);
 
     /**
+     * 通知队列, 优先级已经更改, 需要平衡调整
      * Notify the queue that the priority for {@code node} has changed. The queue will adjust to ensure the priority
      * queue properties are maintained.
      * @param node An object which is in this queue and the priority may have changed.

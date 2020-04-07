@@ -24,20 +24,37 @@ import java.util.NoSuchElementException;
 import static io.netty.util.internal.PriorityQueueNode.INDEX_NOT_IN_QUEUE;
 
 /**
+ * 优先级队列的默认实现. 小顶堆
+ * 性能优化:
+ *  -  这个队列的实现跟 ScheduledThreadPoolExecutor 里的队列基本一样
  * A priority queue which uses natural ordering of elements. Elements are also required to be of type
  * {@link PriorityQueueNode} for the purpose of maintaining the index in the priority queue.
  * @param <T> The object that is maintained in the queue.
  */
 public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends AbstractQueue<T>
                                                                      implements PriorityQueue<T> {
+    /**
+     * 空的队列数组
+     */
     private static final PriorityQueueNode[] EMPTY_ARRAY = new PriorityQueueNode[0];
+    /**
+     * 比较器
+     */
     private final Comparator<T> comparator;
+    /**
+     * 队列数组
+     */
     private T[] queue;
+    /**
+     * 元素个数
+     */
     private int size;
 
     @SuppressWarnings("unchecked")
     public DefaultPriorityQueue(Comparator<T> comparator, int initialSize) {
+        //比较器不能为 null
         this.comparator = ObjectUtil.checkNotNull(comparator, "comparator");
+        //如果初始化长度不为 0 , 则创建, 否则给空的队列数组
         queue = (T[]) (initialSize != 0 ? new PriorityQueueNode[initialSize] : EMPTY_ARRAY);
     }
 
@@ -53,42 +70,54 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
 
     @Override
     public boolean contains(Object o) {
+        //如果不是 PriorityQueueNode 类型, 则返回 false
         if (!(o instanceof PriorityQueueNode)) {
             return false;
         }
+        //强转
         PriorityQueueNode node = (PriorityQueueNode) o;
+        //获取 node 在队列的中索引
         return contains(node, node.priorityQueueIndex(this));
     }
 
     @Override
     public boolean containsTyped(T node) {
+        //判断是否包括
         return contains(node, node.priorityQueueIndex(this));
     }
 
     @Override
     public void clear() {
+        //遍历
         for (int i = 0; i < size; ++i) {
             T node = queue[i];
+            //节点不为 null
             if (node != null) {
+                //清空索引
                 node.priorityQueueIndex(this, INDEX_NOT_IN_QUEUE);
+                //置 null
                 queue[i] = null;
             }
         }
+        //数量变 0
         size = 0;
     }
 
     @Override
     public void clearIgnoringIndexes() {
+        //清空队列数量
         size = 0;
     }
 
     @Override
     public boolean offer(T e) {
+        //如果队列索引不为 INDEX_NOT_IN_QUEUE , 则报错
         if (e.priorityQueueIndex(this) != INDEX_NOT_IN_QUEUE) {
             throw new IllegalArgumentException("e.priorityQueueIndex(): " + e.priorityQueueIndex(this) +
                     " (expected: " + INDEX_NOT_IN_QUEUE + ") + e: " + e);
         }
 
+        //容量不够, 扩容来凑
         // Check that the array capacity is enough to hold values by doubling capacity.
         if (size >= queue.length) {
             // Use a policy which allows for a 0 initial capacity. Same policy as JDK's priority queue, double when
@@ -98,18 +127,23 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
                                                          (queue.length >>> 1)));
         }
 
+        //向上平衡
         bubbleUp(size++, e);
         return true;
     }
 
     @Override
     public T poll() {
+        //没有元素
         if (size == 0) {
             return null;
         }
+        //获队头值
         T result = queue[0];
+        //清空索引
         result.priorityQueueIndex(this, INDEX_NOT_IN_QUEUE);
 
+        //平衡处理
         T last = queue[--size];
         queue[size] = null;
         if (size != 0) { // Make sure we don't add the last element back.
@@ -138,11 +172,14 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
 
     @Override
     public boolean removeTyped(T node) {
+        //获取节点索引
         int i = node.priorityQueueIndex(this);
+        //不包含则返回 false
         if (!contains(node, i)) {
             return false;
         }
 
+        //清空索引
         node.priorityQueueIndex(this, INDEX_NOT_IN_QUEUE);
         if (--size == 0 || size == i) {
             // If there are no node left, or this is the last node in the array just remove and return.
@@ -235,6 +272,9 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
         }
     }
 
+    /**
+     * 根据节点, 节点的索引, 判断队列是否包含节点
+     */
     private boolean contains(PriorityQueueNode node, int i) {
         return i >= 0 && i < size && node.equals(queue[i]);
     }
@@ -291,6 +331,7 @@ public final class DefaultPriorityQueue<T extends PriorityQueueNode> extends Abs
 
         // We have found where node should live and still satisfy the min-heap property, so put it in the queue.
         queue[k] = node;
+        //设置队列的索引
         node.priorityQueueIndex(this, k);
     }
 }

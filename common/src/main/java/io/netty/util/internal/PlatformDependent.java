@@ -893,6 +893,9 @@ public final class PlatformDependent {
             }
         }
 
+        /**
+         * 有界队列
+         */
         static <T> Queue<T> newMpscQueue(final int maxCapacity) {
             // Calculate the max capacity which can not be bigger then MAX_ALLOWED_MPSC_CAPACITY.
             // This is forced by the MpscChunkedArrayQueue implementation as will try to round it
@@ -902,6 +905,9 @@ public final class PlatformDependent {
                                                 : new MpscGrowableAtomicArrayQueue<T>(MPSC_CHUNK_SIZE, capacity);
         }
 
+        /**
+         * 创建无界队列
+         */
         static <T> Queue<T> newMpscQueue() {
             return USE_MPSC_CHUNKED_ARRAY_QUEUE ? new MpscUnboundedArrayQueue<T>(MPSC_CHUNK_SIZE)
                                                 : new MpscUnboundedAtomicArrayQueue<T>(MPSC_CHUNK_SIZE);
@@ -909,6 +915,7 @@ public final class PlatformDependent {
     }
 
     /**
+     * 创建无界队列
      * Create a new {@link Queue} which is safe to use for multiple producers (different threads) and a single
      * consumer (one thread!).
      * @return A MPSC queue which may be unbounded.
@@ -918,6 +925,9 @@ public final class PlatformDependent {
     }
 
     /**
+     * 创建有界队列
+     * - mpsc 是 multiple producers and a single consumer 的缩写
+     * - mpsc 是对多线程生产任务，单线程消费任务的消费，恰好符合 NioEventLoop 的情况
      * Create a new {@link Queue} which is safe to use for multiple producers (different threads) and a single
      * consumer (one thread!).
      */

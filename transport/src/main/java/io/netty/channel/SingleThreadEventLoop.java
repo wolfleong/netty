@@ -156,6 +156,8 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
     @Override
     protected void afterRunningAllTasks() {
         //在运行完所有任务后，执行 tailTasks 队列中的任务
+        //todo wolfleong 暂时理解不了 "到底什么样的任务，适合添加到 tailTasks 中呢?", 等看完再回来研究一下
+        // http://svip.iocoder.cn/Netty/EventLoop-6-EventLoop-handle-normal-task/#
         runAllTasksFrom(tailTasks);
     }
 

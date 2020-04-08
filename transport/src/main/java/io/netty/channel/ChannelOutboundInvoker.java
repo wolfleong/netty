@@ -21,6 +21,13 @@ import io.netty.util.concurrent.FutureListener;
 import java.net.ConnectException;
 import java.net.SocketAddress;
 
+/**
+ * 定义了所有 Outbound 事件对应的方法.
+ *
+ * ChannelOutboundInvoker 和 ChannelOutboundHandler 接口的区别是,
+ *  - 前者定义方法的主要做事件传播调用逻辑
+ *  - 后者定义的方法是实现业务逻辑
+ */
 public interface ChannelOutboundInvoker {
 
     /**

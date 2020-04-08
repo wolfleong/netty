@@ -15,6 +15,9 @@
  */
 package io.netty.channel;
 
+/**
+ * 定义了所有 Inbound 事件对应的方法, 这些方法与 ChannelInboundHandler 的区别是, 此接口的方法主要做事件传播, 后者写业务逻辑
+ */
 public interface ChannelInboundInvoker {
 
     /**

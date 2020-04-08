@@ -40,7 +40,24 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
- * 实现 ChannelPipeline 接口，默认 ChannelPipeline 实现类
+ * 实现 ChannelPipeline 接口，默认 ChannelPipeline 实现类.
+ * - ChannelPipeline 实现的 inbound 和 outbound 方法都是从链头或链尾开始的
+ * - 具体的 ChannelHandlerContext 实现的inbound 和 outbound 方法都是从下一个节点开始的
+ *
+ * Outbound v.s Inbound 事件
+ * 对于 Outbound 事件：
+ *  - Outbound 事件是【请求】事件(由 Connect 发起一个请求, 并最终由 Unsafe 处理这个请求)
+ *  - Outbound 事件的发起者是 Channel
+ *  - Outbound 事件的处理者是 HeadContext, 最终会调用 Unsafe 对应的方法
+ *  - Outbound 事件在 Pipeline 中的传输方向是 tail -> customChannelHandlerContext -> head
+ *
+ * 对于 Inbound 事件：
+ *  - Inbound 事件是【通知】事件, 当某件事情已经就绪后, 通知上层.
+ *  - Inbound 事件发起者是 Unsafe
+ *  - Inbound 事件的处理者是 TailContext, 如果用户没有实现自定义的处理方法, 那么 Inbound 事件默认的处理者是 TailContext, 并且其处理方法是空实现.
+ *  - Inbound 事件在 Pipeline 中传输方向是 head( 头 ) -> customChannelHandlerContext -> tail( 尾 )
+ *
+ *
  * The default {@link ChannelPipeline} implementation.  It is usually created
  * by a {@link Channel} implementation when the {@link Channel} is created.
  */
@@ -1072,6 +1089,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public final ChannelFuture bind(SocketAddress localAddress) {
+        //从 tail 开始调用
         return tail.bind(localAddress);
     }
 
@@ -1415,6 +1433,8 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     /**
      * TailContext ，实现 ChannelInboundHandler 接口，继承 AbstractChannelHandlerContext 抽象类，pipeline 尾节点 Context 实现类。
      * - TailContext 本身是 inbound 处理器
+     * - tail 节点的作用就是结束事件传播，并且对一些重要的事件做一些善意提醒
+     *
      */
     // A special catch-all handler that handles both bytes and messages.
     final class TailContext extends AbstractChannelHandlerContext implements ChannelInboundHandler {
@@ -1578,8 +1598,10 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) {
+            // 传播 Channel active 事件给下一个 Inbound 节点
             ctx.fireChannelActive();
 
+            // 执行 read 逻辑
             readIfIsAutoRead();
         }
 
@@ -1601,7 +1623,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         }
 
         private void readIfIsAutoRead() {
+            //如果是 autoRead
             if (channel.config().isAutoRead()) {
+                //调用 channel.read() 方法
                 channel.read();
             }
         }

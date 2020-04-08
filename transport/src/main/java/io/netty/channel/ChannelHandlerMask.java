@@ -32,6 +32,9 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+/**
+ * ChannelHandler 计算出 ChannelHandler 可执行方法的标记值, 用 int 二进制位来表示那个方法可执行, 那个方法忽略掉
+ */
 final class ChannelHandlerMask {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ChannelHandlerMask.class);
 
@@ -54,12 +57,21 @@ final class ChannelHandlerMask {
     static final int MASK_WRITE = 1 << 15;
     static final int MASK_FLUSH = 1 << 16;
 
+    /**
+     * inbound 所有方法都可执行的二进制位
+     */
     private static final int MASK_ALL_INBOUND = MASK_EXCEPTION_CAUGHT | MASK_CHANNEL_REGISTERED |
             MASK_CHANNEL_UNREGISTERED | MASK_CHANNEL_ACTIVE | MASK_CHANNEL_INACTIVE | MASK_CHANNEL_READ |
             MASK_CHANNEL_READ_COMPLETE | MASK_USER_EVENT_TRIGGERED | MASK_CHANNEL_WRITABILITY_CHANGED;
+    /**
+     * outbound 所有方法可执行的二进制位
+     */
     private static final int MASK_ALL_OUTBOUND = MASK_EXCEPTION_CAUGHT | MASK_BIND | MASK_CONNECT | MASK_DISCONNECT |
             MASK_CLOSE | MASK_DEREGISTER | MASK_READ | MASK_WRITE | MASK_FLUSH;
 
+    /**
+     * 线程本地缓存
+     */
     private static final FastThreadLocal<Map<Class<? extends ChannelHandler>, Integer>> MASKS =
             new FastThreadLocal<Map<Class<? extends ChannelHandler>, Integer>>() {
                 @Override
@@ -69,11 +81,13 @@ final class ChannelHandlerMask {
             };
 
     /**
+     * 获取类可执行方法的二进制位
      * Return the {@code executionMask}.
      */
     static int mask(Class<? extends ChannelHandler> clazz) {
         // Try to obtain the mask from the cache first. If this fails calculate it and put it in the cache for fast
         // lookup in the future.
+        //缓存中获取, 缓存没有则计算出来, 并添加到缓存中
         Map<Class<? extends ChannelHandler>, Integer> cache = MASKS.get();
         Integer mask = cache.get(clazz);
         if (mask == null) {
@@ -84,9 +98,11 @@ final class ChannelHandlerMask {
     }
 
     /**
+     * 计算类可执行方法的二进制位
      * Calculate the {@code executionMask}.
      */
     private static int mask0(Class<? extends ChannelHandler> handlerType) {
+        //异常方法肯定可执行
         int mask = MASK_EXCEPTION_CAUGHT;
         try {
             if (ChannelInboundHandler.class.isAssignableFrom(handlerType)) {

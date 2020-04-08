@@ -72,6 +72,7 @@ public interface ChannelOutboundHandler extends ChannelHandler {
     void deregister(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception;
 
     /**
+     * 触发 read 的事件的注册
      * Intercepts {@link ChannelHandlerContext#read()}.
      */
     void read(ChannelHandlerContext ctx) throws Exception;

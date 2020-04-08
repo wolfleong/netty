@@ -112,6 +112,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
      * 是否使用有序的 EventExecutor ( {@link #executor} )，即 OrderedEventExecutor
      */
     private final boolean ordered;
+    /**
+     * 可执行方法的标记值, 二进制位来表示 ChannelHandler 那些方法可以执行, 那些方法跳过
+     */
     private final int executionMask;
 
     // Will be set to null if no child executor should be used, otherwise it will be set to the
@@ -130,7 +133,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     private Tasks invokeTasks;
 
     /**
-     * 处理器状态
+     * 处理器状态, 默认是 INIT
      */
     private volatile int handlerState = INIT;
 
@@ -139,6 +142,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         this.name = ObjectUtil.checkNotNull(name, "name");
         this.pipeline = pipeline;
         this.executor = executor;
+        //计算 ChannelHandler 可执行方法的二进制标记
         this.executionMask = mask(handlerClass);
         // Its ordered if its driven by the EventLoop or the given Executor is an instanceof OrderedEventExecutor.
         ordered = executor == null || executor instanceof OrderedEventExecutor;
@@ -159,6 +163,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         return channel().config().getAllocator();
     }
 
+    /**
+     * 如果未设置子执行器，则使用 Channel 的 EventLoop 作为执行器
+     */
     @Override
     public EventExecutor executor() {
         if (executor == null) {
@@ -239,6 +246,8 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     @Override
     public ChannelHandlerContext fireChannelActive() {
+        // 获得下一个 Inbound 节点的执行器
+        // 调用下一个 Inbound 节点的 Channel active 方法
         invokeChannelActive(findContextInbound(MASK_CHANNEL_ACTIVE));
         return this;
     }
@@ -271,12 +280,18 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     @Override
     public ChannelHandlerContext fireChannelInactive() {
+        //触发下一个节点的事件
         invokeChannelInactive(findContextInbound(MASK_CHANNEL_INACTIVE));
         return this;
     }
 
+    /**
+     * 触发 ChannelInactive 事件
+     */
     static void invokeChannelInactive(final AbstractChannelHandlerContext next) {
+        // 获得下一个 Inbound 节点的执行器
         EventExecutor executor = next.executor();
+        // 调用下一个 Inbound 节点的 Channel active 方法
         if (executor.inEventLoop()) {
             next.invokeChannelInactive();
         } else {
@@ -290,13 +305,17 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     }
 
     private void invokeChannelInactive() {
+        // 判断是否符合的 ChannelHandler
         if (invokeHandler()) {
             try {
+                // 调用该 ChannelHandler 的 Channel active 方法
                 ((ChannelInboundHandler) handler()).channelInactive(this);
             } catch (Throwable t) {
+                // 通知 Inbound 事件的传播，发生异常
                 notifyHandlerException(t);
             }
         } else {
+            // 跳过，传播 Inbound 事件给下一个节点
             fireChannelInactive();
         }
     }
@@ -329,9 +348,15 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         }
     }
 
+    /**
+     * 传播异常事件
+     *  Exception Caught 事件在 pipeline 的起始节点，不是 head 头节点，而是发生异常的当前节点开始。怎么理解好呢???
+     *  对于在 pipeline 上传播的 Inbound xxx 事件，在发生异常后，转化成 Exception Caught 事件，继续从当前节点，继续向下传播。
+     */
     private void invokeExceptionCaught(final Throwable cause) {
         if (invokeHandler()) {
             try {
+                //当前触发当前节点的异常处理
                 handler().exceptionCaught(this, cause);
             } catch (Throwable error) {
                 if (logger.isDebugEnabled()) {
@@ -348,6 +373,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
                 }
             }
         } else {
+            //当前节点处理不了, 传播给下一个节点
             fireExceptionCaught(cause);
         }
     }
@@ -510,16 +536,23 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         return deregister(newPromise());
     }
 
+    /**
+     * 调用下一个节点的 bind 方法
+     */
     @Override
     public ChannelFuture bind(final SocketAddress localAddress, final ChannelPromise promise) {
         ObjectUtil.checkNotNull(localAddress, "localAddress");
+        // 判断是否为合法的 Promise 对象
         if (isNotValidPromise(promise, false)) {
             // cancelled
             return promise;
         }
 
+        // 获得下一个 Outbound 可执行 bind 方法的节点
         final AbstractChannelHandlerContext next = findContextOutbound(MASK_BIND);
+        // 获得下一个 Outbound 节点的执行器
         EventExecutor executor = next.executor();
+        // 调用下一个 Outbound 节点的 bind 方法
         if (executor.inEventLoop()) {
             next.invokeBind(localAddress, promise);
         } else {
@@ -530,17 +563,23 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
                 }
             }, promise, null, false);
         }
+        //返回异步结果
         return promise;
     }
 
     private void invokeBind(SocketAddress localAddress, ChannelPromise promise) {
+        // 判断当前节点是否符合的 ChannelHandler, 也就是状态对不对
         if (invokeHandler()) {
+            //这里是当前节点的 bind 逻辑
             try {
+                // 调用该 ChannelHandler 的 bind 方法
                 ((ChannelOutboundHandler) handler()).bind(this, localAddress, promise);
             } catch (Throwable t) {
+                // 通知 Outbound 事件的传播，发生异常
                 notifyOutboundHandlerException(t, promise);
             }
         } else {
+            // 跳过当前节点，传播 Outbound 事件给下一个节点
             bind(localAddress, promise);
         }
     }
@@ -848,6 +887,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     }
 
     private void notifyHandlerException(Throwable cause) {
+        //如果是在 `ChannelHandler#exceptionCaught(ChannelHandlerContext ctx, Throwable cause)` 方法中，仅打印错误日志。否则会形成死循环
         if (inExceptionCaught(cause)) {
             if (logger.isWarnEnabled()) {
                 logger.warn(
@@ -857,17 +897,23 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             return;
         }
 
+        //在 pipeline 中，传播 Exception Caught 事件
         invokeExceptionCaught(cause);
     }
 
+    /**
+     * 判断异常是不是 exceptionCaught 方法抛出的, 避免死循环
+     */
     private static boolean inExceptionCaught(Throwable cause) {
         do {
             StackTraceElement[] trace = cause.getStackTrace();
             if (trace != null) {
+                //遍历
                 for (StackTraceElement t : trace) {
                     if (t == null) {
                         break;
                     }
+                    // 通过方法名判断
                     if ("exceptionCaught".equals(t.getMethodName())) {
                         return true;
                     }
@@ -875,6 +921,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             }
 
             cause = cause.getCause();
+            // 循环异常的 cause() ，直到到没有
         } while (cause != null);
 
         return false;
@@ -904,9 +951,13 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         return new FailedChannelFuture(channel(), executor(), cause);
     }
 
+    /**
+     * 判断 promise 是否为合法的 Promise 对象
+     */
     private boolean isNotValidPromise(ChannelPromise promise, boolean allowVoidPromise) {
         ObjectUtil.checkNotNull(promise, "promise");
 
+        // Promise 已经完成
         if (promise.isDone()) {
             // Check if the promise was cancelled and if so signal that the processing of the operation
             // should not be performed.
@@ -918,20 +969,24 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             throw new IllegalArgumentException("promise already done: " + promise);
         }
 
+        // Channel 不符合
         if (promise.channel() != channel()) {
             throw new IllegalArgumentException(String.format(
                     "promise.channel does not match: %s (expected: %s)", promise.channel(), channel()));
         }
 
+        // DefaultChannelPromise 合法
         if (promise.getClass() == DefaultChannelPromise.class) {
             return false;
         }
 
+        // 禁止 VoidChannelPromise
         if (!allowVoidPromise && promise instanceof VoidChannelPromise) {
             throw new IllegalArgumentException(
                     StringUtil.simpleClassName(VoidChannelPromise.class) + " not allowed for this operation");
         }
 
+        // 禁止 CloseFuture
         if (promise instanceof AbstractChannel.CloseFuture) {
             throw new IllegalArgumentException(
                     StringUtil.simpleClassName(AbstractChannel.CloseFuture.class) + " not allowed in a pipeline");
@@ -939,6 +994,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         return false;
     }
 
+    /**
+     * 当前节点的下一个节点向后遍历查找, 直到存在可执行的方法为止
+     */
     private AbstractChannelHandlerContext findContextInbound(int mask) {
         AbstractChannelHandlerContext ctx = this;
         do {
@@ -947,6 +1005,10 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         return ctx;
     }
 
+    /**
+     * 当前节点的上一个节点开始向前遍历查找, 直到存在可执行的方法为止
+     * tail => head , 向前
+     */
     private AbstractChannelHandlerContext findContextOutbound(int mask) {
         AbstractChannelHandlerContext ctx = this;
         do {
@@ -1026,6 +1088,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     }
 
     /**
+     *  - 对于 ordered = true 的节点，必须 ChannelHandler 已经添加完成。
+     *  - 对于 ordered = false 的节点，没有 ChannelHandler 的要求。
+     *
      * Makes best possible effort to detect if {@link ChannelHandler#handlerAdded(ChannelHandlerContext)} was called
      * yet. If not return {@code false} and if called or could not detect return {@code true}.
      *
@@ -1054,19 +1119,27 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         return channel().hasAttr(key);
     }
 
+    /**
+     * 提交到 EventLoop 的线程中执行
+     */
     private static boolean safeExecute(EventExecutor executor, Runnable runnable,
             ChannelPromise promise, Object msg, boolean lazy) {
         try {
+            //如果延迟执行且执行器是 AbstractEventExecutor 类型
             if (lazy && executor instanceof AbstractEventExecutor) {
+                //延迟执行是不唤醒 Selector 的
                 ((AbstractEventExecutor) executor).lazyExecute(runnable);
             } else {
+                // 提交 EventLoop 的线程中，进行执行任务, 这个会唤醒 Selector
                 executor.execute(runnable);
             }
             return true;
         } catch (Throwable cause) {
             try {
+                // 发生异常，回调通知 promise 相关的异常
                 promise.setFailure(cause);
             } finally {
+                // 释放 msg 相关的资源
                 if (msg != null) {
                     ReferenceCountUtil.release(msg);
                 }

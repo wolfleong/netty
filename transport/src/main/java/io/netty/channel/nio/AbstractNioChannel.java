@@ -62,6 +62,9 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * 原生的 SelectionKey
      */
     volatile SelectionKey selectionKey;
+    /**
+     * 表示正在等待读
+     */
     boolean readPending;
     private final Runnable clearReadPendingRunnable = new Runnable() {
         @Override
@@ -177,8 +180,10 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * Set read pending to {@code false}.
      */
     protected final void clearReadPending() {
+        //如果已经注册
         if (isRegistered()) {
             EventLoop eventLoop = eventLoop();
+            //当前线程为 EventLoop 线程
             if (eventLoop.inEventLoop()) {
                 clearReadPending0();
             } else {
@@ -201,6 +206,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
     private void clearReadPending0() {
         readPending = false;
+        // 移除对“读”事件的感兴趣。
         ((AbstractNioUnsafe) unsafe()).removeReadOp();
     }
 
@@ -228,14 +234,19 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
     protected abstract class AbstractNioUnsafe extends AbstractUnsafe implements NioUnsafe {
 
+        /**
+         * 移除对“读”事件的感兴趣
+         */
         protected final void removeReadOp() {
             SelectionKey key = selectionKey();
             // Check first if the key is still valid as it may be canceled as part of the deregistration
             // from the EventLoop
             // See https://github.com/netty/netty/issues/2104
+            // 忽略，如果 SelectionKey 不合法，例如已经取消
             if (!key.isValid()) {
                 return;
             }
+            // 移除对“读”事件的感兴趣。
             int interestOps = key.interestOps();
             if ((interestOps & readInterestOp) != 0) {
                 // only remove readInterestOp if needed
@@ -412,6 +423,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             // Flush immediately only when there's no pending flush.
             // If there's a pending flush operation, event loop will call forceFlush() later,
             // and thus there's no need to call it now.
+            //是否已经处于 flush 准备中, 也就是对 OP_WRITE 不感兴趣的时候就是可以 flush
             if (!isFlushPending()) {
                 super.flush0();
             }
@@ -423,8 +435,19 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             super.flush0();
         }
 
+        /**
+         * 判断，是否已经处于 flush 准备中.
+         *
+         * 所以在 Netty 的实现中，默认 Channel 是可写的，当写入失败的时候，再去注册 SelectionKey.OP_WRITE 事件。这意味着什么呢？
+         * 在 #flush() 方法中，如果写入数据到 Channel 失败，会通过注册 SelectionKey.OP_WRITE 事件，然后在轮询到 Channel 可写 时，再“回调” #forceFlush() 方法
+         *
+         * 这就是这段代码的目的，如果处于对 SelectionKey.OP_WRITE 事件感兴趣，说明 Channel 此时是不可写的，
+         * 那么调用父类 AbstractUnsafe 的 #flush0() 方法，也没有意义，所以就不调用。
+         */
         private boolean isFlushPending() {
             SelectionKey selectionKey = selectionKey();
+            // selectionKey.isValid() 合法
+            // 对 SelectionKey.OP_WRITE 事件感兴趣
             return selectionKey.isValid() && (selectionKey.interestOps() & SelectionKey.OP_WRITE) != 0;
         }
     }
@@ -468,6 +491,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
     @Override
     protected void doDeregister() throws Exception {
+        //执行取消注册
         eventLoop().cancel(selectionKey());
     }
 
@@ -481,6 +505,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             return;
         }
 
+        //设置正在读取中, 也就是添加了感兴趣的读事件
         readPending = true;
 
         //获取感兴取的事件
@@ -574,6 +599,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
     @Override
     protected void doClose() throws Exception {
+        // 通知 connectPromise 异常失败
         ChannelPromise promise = connectPromise;
         if (promise != null) {
             // Use tryFailure() instead of setFailure() to avoid the race against cancel().
@@ -581,6 +607,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             connectPromise = null;
         }
 
+        // 取消 connectTimeoutFuture 等待
         ScheduledFuture<?> future = connectTimeoutFuture;
         if (future != null) {
             future.cancel(false);

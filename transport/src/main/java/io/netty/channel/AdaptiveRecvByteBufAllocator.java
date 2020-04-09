@@ -104,6 +104,9 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
             nextReceiveBufferSize = SIZE_TABLE[index];
         }
 
+        /**
+         * 设置最后读取字节数
+         */
         @Override
         public void lastBytesRead(int bytes) {
             // If we read as much as we asked for we should check if we need to ramp up the size of our next guess.

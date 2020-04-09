@@ -32,6 +32,7 @@ import static io.netty.util.internal.MacAddressUtil.defaultMachineId;
 import static io.netty.util.internal.MacAddressUtil.parseMAC;
 
 /**
+ * ChanelId 接口的默认实现类
  * The default {@link ChannelId} implementation.
  */
 public final class DefaultChannelId implements ChannelId {
@@ -207,6 +208,7 @@ public final class DefaultChannelId implements ChannelId {
     public String asShortText() {
         String shortValue = this.shortValue;
         if (shortValue == null) {
+            //仅使用最后 4 字节的随机数字，并转换成 16 进制的数字字符串。也因此，短，但是全局非唯一。
             this.shortValue = shortValue = ByteBufUtil.hexDump(data, data.length - RANDOM_LEN, RANDOM_LEN);
         }
         return shortValue;
@@ -216,6 +218,7 @@ public final class DefaultChannelId implements ChannelId {
     public String asLongText() {
         String longValue = this.longValue;
         if (longValue == null) {
+            //将id值全部转 16 进制
             this.longValue = longValue = newLongValue();
         }
         return longValue;

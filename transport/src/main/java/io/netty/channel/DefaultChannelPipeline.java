@@ -125,7 +125,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
      */
     private Map<EventExecutorGroup, EventExecutor> childExecutors;
     /**
-     * DefaultChannelPipeline 字段用途
+     * 用于计算消息大小处理器
      */
     private volatile MessageSizeEstimator.Handle estimatorHandle;
     /**
@@ -170,9 +170,13 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     final MessageSizeEstimator.Handle estimatorHandle() {
+        //获取处理器
         MessageSizeEstimator.Handle handle = estimatorHandle;
+        //处理器为 null
         if (handle == null) {
+            //创建
             handle = channel.config().getMessageSizeEstimator().newHandle();
+            //设置不成功, 则返回设置的
             if (!ESTIMATOR.compareAndSet(this, null, handle)) {
                 handle = estimatorHandle;
             }
@@ -180,6 +184,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return handle;
     }
 
+    /**
+     * 记录 Record 记录
+     */
     final Object touch(Object msg, AbstractChannelHandlerContext next) {
         return touch ? ReferenceCountUtil.touch(msg, next) : msg;
     }
@@ -1372,6 +1379,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                     "Discarded inbound message {} that reached at the tail of the pipeline. " +
                             "Please check your pipeline configuration.", msg);
         } finally {
+            //释放 ByteBuf
             ReferenceCountUtil.release(msg);
         }
     }
@@ -1617,8 +1625,10 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
         @Override
         public void channelReadComplete(ChannelHandlerContext ctx) {
+            //通知读取完成
             ctx.fireChannelReadComplete();
 
+            //开启下一次读取
             readIfIsAutoRead();
         }
 

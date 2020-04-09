@@ -18,6 +18,7 @@ package io.netty.util.internal;
 import io.netty.util.Recycler;
 
 /**
+ * 轻量级对象池接口
  * Light-weight object pool.
  *
  * @param <T> the type of the pooled object
@@ -45,6 +46,7 @@ public abstract class ObjectPool<T> {
     }
 
     /**
+     * 对象创建接口
      * Creates a new Object which references the given {@link Handle} and calls {@link Handle#recycle(Object)} once
      * it can be re-used.
      *
@@ -60,6 +62,7 @@ public abstract class ObjectPool<T> {
     }
 
     /**
+     * 创建 ObjectPool 对象
      * Creates a new {@link ObjectPool} which will use the given {@link ObjectCreator} to create the {@link Object}
      * that should be pooled.
      */
@@ -67,10 +70,14 @@ public abstract class ObjectPool<T> {
         return new RecyclerObjectPool<T>(ObjectUtil.checkNotNull(creator, "creator"));
     }
 
+    /**
+     * 对象池的实现, 基于 Recycler
+     */
     private static final class RecyclerObjectPool<T> extends ObjectPool<T> {
         private final Recycler<T> recycler;
 
         RecyclerObjectPool(final ObjectCreator<T> creator) {
+            //创建 Recycler
              recycler = new Recycler<T>() {
                 @Override
                 protected T newObject(Handle<T> handle) {
@@ -81,6 +88,7 @@ public abstract class ObjectPool<T> {
 
         @Override
         public T get() {
+            //从 recycler 中获取
             return recycler.get();
         }
     }

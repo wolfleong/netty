@@ -76,6 +76,11 @@ public interface SocketChannelConfig extends ChannelConfig {
     SocketChannelConfig setTcpNoDelay(boolean tcpNoDelay);
 
     /**
+     * Socket 参数，关闭 Socket 的延迟时间，Netty 默认值为 -1 ，表示禁用该功能。
+     *  - -1 表示 socket.close() 方法立即返回，但 OS 底层会将发送缓冲区全部发送到对端。
+     *  - 0 表示 socket.close() 方法立即返回，OS 放弃发送缓冲区的数据直接向对端发送RST包，对端收到复位错误。
+     *  - 非 0 整数值表示调用 socket.close() 方法的线程被阻塞直到延迟时间到发送缓冲区中的数据发送完毕，若超时，则对端会收到复位错误。
+     *
      * Gets the {@link StandardSocketOptions#SO_LINGER} option.
      */
     int getSoLinger();
@@ -142,6 +147,10 @@ public interface SocketChannelConfig extends ChannelConfig {
     SocketChannelConfig setPerformancePreferences(int connectionTime, int latency, int bandwidth);
 
     /**
+     * Netty 参数，一个连接的远端关闭时本地端是否关闭，默认值为 false 。
+     * 值为 false时，连接自动关闭。
+     * 值为 true 时，触发 ChannelInboundHandler 的#userEventTriggered() 方法，事件 ChannelInputShutdownEvent 。
+     *
      * Returns {@code true} if and only if the channel should not close itself when its remote
      * peer shuts down output to make the connection half-closed.  If {@code false}, the connection
      * is closed automatically when the remote peer shuts down output.

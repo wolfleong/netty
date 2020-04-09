@@ -121,8 +121,10 @@ public abstract class DefaultMaxMessagesRecvByteBufAllocator implements MaxMessa
 
         @Override
         public void lastBytesRead(int bytes) {
+            // 设置最后一次读取字节数
             lastBytesRead = bytes;
             if (bytes > 0) {
+                // 总共读取字节数
                 totalBytesRead += bytes;
             }
         }

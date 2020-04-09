@@ -760,10 +760,15 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     void cancel(SelectionKey key) {
+        //取消
         key.cancel();
+        //取消 key 个数统计
         cancelledKeys ++;
+        //如果大于等于 CLEANUP_INTERVAL
         if (cancelledKeys >= CLEANUP_INTERVAL) {
+            //重置
             cancelledKeys = 0;
+            //设置 select 一次
             needsToSelectAgain = true;
         }
     }

@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * NioServerSocketChannel 读取新的连接。
  * A {@link io.netty.channel.socket.ServerSocketChannel} implementation which uses
  * NIO selector based implementation to accept new connections.
  */
@@ -152,23 +153,28 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
 
     @Override
     protected int doReadMessages(List<Object> buf) throws Exception {
+        //接受新的客户端接入
         SocketChannel ch = SocketUtils.accept(javaChannel());
 
         try {
             if (ch != null) {
+                //创建 NioSocketChannel 添加到 buf 中
                 buf.add(new NioSocketChannel(this, ch));
+                //返回 1 表示成功
                 return 1;
             }
         } catch (Throwable t) {
             logger.warn("Failed to create a new channel from an accepted socket.", t);
 
             try {
+                //有异常则关闭
                 ch.close();
             } catch (Throwable t2) {
                 logger.warn("Failed to close a socket.", t2);
             }
         }
 
+        //没有客户端则返回 0
         return 0;
     }
 

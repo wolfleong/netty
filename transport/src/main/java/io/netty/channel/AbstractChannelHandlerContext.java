@@ -128,6 +128,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
      */
     private ChannelFuture succeededFuture;
 
+    /**
+     * 延迟执行的任务实例
+     */
     // Lazily instantiated tasks used to trigger events to a handler with different executor.
     // There is no need to make this volatile as at worse it will just create a few more instances then needed.
     private Tasks invokeTasks;
@@ -743,9 +746,11 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             next.invokeRead();
         } else {
             Tasks tasks = next.invokeTasks;
+            //初始化 Tasks 实例
             if (tasks == null) {
                 next.invokeTasks = tasks = new Tasks(next);
             }
+            //获取 task 实例中的 读任务
             executor.execute(tasks.invokeReadTask);
         }
 
@@ -794,15 +799,21 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     @Override
     public ChannelHandlerContext flush() {
+        // 获得下一个 Outbound 节点
         final AbstractChannelHandlerContext next = findContextOutbound(MASK_FLUSH);
         EventExecutor executor = next.executor();
+        // 在 EventLoop 的线程中
         if (executor.inEventLoop()) {
+            // 执行 flush 事件到下一个节点
             next.invokeFlush();
+            // 不在 EventLoop 的线程中
         } else {
+            // 创建 flush 任务
             Tasks tasks = next.invokeTasks;
             if (tasks == null) {
                 next.invokeTasks = tasks = new Tasks(next);
             }
+            // 提交到 EventLoop 的线程中，执行该任务
             safeExecute(executor, tasks.invokeFlushTask, channel().voidPromise(), null, false);
         }
 
@@ -841,35 +852,47 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     }
 
     private void write(Object msg, boolean flush, ChannelPromise promise) {
+        // 消息( 数据 )为空，抛出异常
         ObjectUtil.checkNotNull(msg, "msg");
         try {
+            // 判断是否为合法的 Promise 对象
             if (isNotValidPromise(promise, true)) {
+                // 释放消息( 数据 )相关的资源
                 ReferenceCountUtil.release(msg);
                 // cancelled
                 return;
             }
         } catch (RuntimeException e) {
+            // 发生异常，释放消息( 数据 )相关的资源
             ReferenceCountUtil.release(msg);
             throw e;
         }
 
+        // 获得下一个 Outbound 节点
         final AbstractChannelHandlerContext next = findContextOutbound(flush ?
                 (MASK_WRITE | MASK_FLUSH) : MASK_WRITE);
+        // 记录 Record 记录
         final Object m = pipeline.touch(msg, next);
+        // 在 EventLoop 的线程中
         EventExecutor executor = next.executor();
         if (executor.inEventLoop()) {
+            // 执行 writeAndFlush 事件到下一个节点
             if (flush) {
                 next.invokeWriteAndFlush(m, promise);
             } else {
+                // 执行 write 事件到下一个节点
                 next.invokeWrite(m, promise);
             }
         } else {
+            // 创建 writeAndFlush 任务
             final WriteTask task = WriteTask.newInstance(next, m, promise, flush);
+            // 提交到 EventLoop 的线程中，执行该任务
             if (!safeExecute(executor, task, promise, m, !flush)) {
                 // We failed to submit the WriteTask. We need to cancel it so we decrement the pending bytes
                 // and put it back in the Recycler for re-use later.
                 //
                 // See https://github.com/netty/netty/issues/8343.
+                //提交失败, 取消任务
                 task.cancel();
             }
         }
@@ -1158,7 +1181,11 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         return StringUtil.simpleClassName(ChannelHandlerContext.class) + '(' + name + ", " + channel() + ')';
     }
 
+    /**
+     * 写任务
+     */
     static final class WriteTask implements Runnable {
+        //创建一个对象池
         private static final ObjectPool<WriteTask> RECYCLER = ObjectPool.newPool(new ObjectCreator<WriteTask>() {
             @Override
             public WriteTask newObject(Handle<WriteTask> handle) {
@@ -1168,22 +1195,52 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
         static WriteTask newInstance(AbstractChannelHandlerContext ctx,
                 Object msg, ChannelPromise promise, boolean flush) {
+            //从池中获取 WriteTask 对象
             WriteTask task = RECYCLER.get();
+            //初始化
             init(task, ctx, msg, promise, flush);
             return task;
         }
 
+        /**
+         * 提交任务时，是否计算 AbstractWriteTask 对象的自身占用内存大小
+         */
         private static final boolean ESTIMATE_TASK_SIZE_ON_SUBMIT =
                 SystemPropertyUtil.getBoolean("io.netty.transport.estimateSizeOnSubmit", true);
 
+        /**
+         * 每个 AbstractWriteTask 对象自身占用内存的大小。
+         * 每个 AbstractWriteTask 对象自身占用内存的大小。为什么占用的 48 字节呢？
+         *   - 16 bytes object header ，对象头，16 字节。
+         *   - 3 reference fields ，3 个对象引用字段，3 * 8 = 24 字节。
+         *   - 1 int fields ，1 个 int 字段，4 字节。
+         *   - padding ，补齐 8 字节的整数倍，因此 4 字节。
+         * 因此，合计 48 字节( 64 位的 JVM 虚拟机，并且不考虑压缩 )。
+         */
         // Assuming compressed oops, 12 bytes obj header, 4 ref fields and one int field
         private static final int WRITE_TASK_OVERHEAD =
                 SystemPropertyUtil.getInt("io.netty.transport.writeTaskSizeOverhead", 32);
 
+        /**
+         * Recycler 处理器。而 Recycler 是 Netty 用来实现对象池的工具类。在网络通信中，写入是非常频繁的操作，
+         * 因此通过 Recycler 重用 AbstractWriteTask 对象，减少对象的频繁创建，降低 GC 压力，提升性能。
+         */
         private final Handle<WriteTask> handle;
+        /**
+         * pipeline 中的节点
+         */
         private AbstractChannelHandlerContext ctx;
+        /**
+         * 消息( 数据 )
+         */
         private Object msg;
+        /**
+         * Promise 对象
+         */
         private ChannelPromise promise;
+        /**
+         * 对象大小, 符号位控制是否刷新, 也就是如果为负数, 则为 flush
+         */
         private int size; // sign bit controls flush
 
         @SuppressWarnings("unchecked")
@@ -1191,19 +1248,27 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             this.handle = (Handle<WriteTask>) handle;
         }
 
+        /**
+         * 初始化写任务
+         */
         protected static void init(WriteTask task, AbstractChannelHandlerContext ctx,
                                    Object msg, ChannelPromise promise, boolean flush) {
             task.ctx = ctx;
             task.msg = msg;
             task.promise = promise;
 
+            // 计算 AbstractWriteTask 对象大小
             if (ESTIMATE_TASK_SIZE_ON_SUBMIT) {
+                // task 的大小 = task 对象的大小 + 消息的大小
                 task.size = ctx.pipeline.estimatorHandle().size(msg) + WRITE_TASK_OVERHEAD;
+                // 增加 ChannelOutboundBuffer 的 totalPendingSize 属性
                 ctx.pipeline.incrementPendingOutboundBytes(task.size);
             } else {
                 task.size = 0;
             }
+            //标记是否刷新
             if (flush) {
+                //Integer.MIN_VALUE 相当于 1 << 31 , 也就是高 32 位为 1, 低 31 位都为 0
                 task.size |= Integer.MIN_VALUE;
             }
         }
@@ -1211,21 +1276,30 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         @Override
         public void run() {
             try {
+                // 减少 ChannelOutboundBuffer 的 totalPendingSize 属性
                 decrementPendingOutboundBytes();
                 if (size >= 0) {
+                    // 执行 write 事件到下一个节点
                     ctx.invokeWrite(msg, promise);
                 } else {
+                    //写入并刷新
                     ctx.invokeWriteAndFlush(msg, promise);
                 }
             } finally {
+                //执行完, 回收当前 task
                 recycle();
             }
         }
 
+        /**
+         * 取消任务
+         */
         void cancel() {
             try {
+                //减少 ChannelOutboundBuffer 的 totalPendingSize 属性
                 decrementPendingOutboundBytes();
             } finally {
+                //回收
                 recycle();
             }
         }
@@ -1237,34 +1311,51 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         }
 
         private void recycle() {
+            // 置空，help gc
             // Set to null so the GC can collect them directly
             ctx = null;
             msg = null;
             promise = null;
+            // 回收对象
             handle.recycle(this);
         }
     }
 
     private static final class Tasks {
+        /**
+         * 下一个节点
+         */
         private final AbstractChannelHandlerContext next;
+        /**
+         * 读完成的任务
+         */
         private final Runnable invokeChannelReadCompleteTask = new Runnable() {
             @Override
             public void run() {
                 next.invokeChannelReadComplete();
             }
         };
+        /**
+         * 读连接任务
+         */
         private final Runnable invokeReadTask = new Runnable() {
             @Override
             public void run() {
                 next.invokeRead();
             }
         };
+        /**
+         * 写状态改变任务
+         */
         private final Runnable invokeChannelWritableStateChangedTask = new Runnable() {
             @Override
             public void run() {
                 next.invokeChannelWritabilityChanged();
             }
         };
+        /**
+         * flush 任务
+         */
         private final Runnable invokeFlushTask = new Runnable() {
             @Override
             public void run() {

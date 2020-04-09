@@ -61,6 +61,7 @@ import java.util.Map;
  * More options are available in the sub-types of {@link ChannelConfig}.  For
  * example, you can configure the parameters which are specific to a TCP/IP
  * socket as explained in {@link SocketChannelConfig}.
+ * Channel 配置接口
  */
 public interface ChannelConfig {
 
@@ -142,6 +143,7 @@ public interface ChannelConfig {
     ChannelConfig setMaxMessagesPerRead(int maxMessagesPerRead);
 
     /**
+     * 默认值为 DefaultChannelConfig.writeSpinCount = 16 ，可配置修改，一般不需要
      * Returns the maximum loop count for a write operation until
      * {@link WritableByteChannel#write(ByteBuffer)} returns a non-zero value.
      * It is similar to what a spin lock is used for in concurrency programming.

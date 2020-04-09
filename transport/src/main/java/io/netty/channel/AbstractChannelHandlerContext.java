@@ -631,11 +631,19 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     @Override
     public ChannelFuture disconnect(final ChannelPromise promise) {
+        //Java 原生 NIO SocketChannel 不存在，当调用 Netty NioSocketChannel#disconnect(ChannelPromise promise) 时，会自动转换成 close 操作
+        //实际上， Channel#disconnect(ChannelPromise promise) 方法，是 Netty 为 UDP 设计的。
+
+        //如果没有 disconnect 操作，则执行 close 事件在 pipeline 上
         if (!channel().metadata().hasDisconnect()) {
             // Translate disconnect to close if the channel has no notion of disconnect-reconnect.
             // So far, UDP/IP is the only transport that has such behavior.
             return close(promise);
         }
+
+        //也就是只有 UDP 相关的才会进来下面的逻辑
+
+        // 判断是否为合法的 Promise 对象
         if (isNotValidPromise(promise, false)) {
             // cancelled
             return promise;

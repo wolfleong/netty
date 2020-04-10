@@ -35,6 +35,7 @@ import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 
 /**
+ * 继承 ByteBuf 抽象类，用于构建空 ByteBuf 对象，capacity 和 maxCapacity 均为 0 。
  * An empty {@link ByteBuf} whose capacity and maximum capacity are all {@code 0}.
  */
 public final class EmptyByteBuf extends ByteBuf {

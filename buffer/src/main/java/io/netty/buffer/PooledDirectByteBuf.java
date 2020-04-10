@@ -25,8 +25,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+/**
+ * 实现 PooledByteBuf 抽象类，基于 ByteBuffer 的可重用 ByteBuf 实现类。所以，泛型 T 为 ByteBuffer
+ */
 final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
 
+    /**
+     * Recycler 对象
+     */
     private static final ObjectPool<PooledDirectByteBuf> RECYCLER = ObjectPool.newPool(
             new ObjectCreator<PooledDirectByteBuf>() {
         @Override
@@ -36,7 +42,9 @@ final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
     });
 
     static PooledDirectByteBuf newInstance(int maxCapacity) {
+        // 从 Recycler 的对象池中获得 PooledDirectByteBuf 对象
         PooledDirectByteBuf buf = RECYCLER.get();
+        // 重置 PooledDirectByteBuf 的属性
         buf.reuse(maxCapacity);
         return buf;
     }
@@ -47,6 +55,7 @@ final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
 
     @Override
     protected ByteBuffer newInternalNioBuffer(ByteBuffer memory) {
+        //复制一个 ByteBuffer 对象，共享里面的数据
         return memory.duplicate();
     }
 
@@ -281,8 +290,11 @@ final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
 
     @Override
     public ByteBuf copy(int index, int length) {
+        // 校验索引
         checkIndex(index, length);
+        // 创建一个 Direct ByteBuf 对象
         ByteBuf copy = alloc().directBuffer(length, maxCapacity());
+        // 写入数据
         return copy.writeBytes(this, index, length);
     }
 

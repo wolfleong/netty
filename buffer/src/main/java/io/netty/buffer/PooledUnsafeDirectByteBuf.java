@@ -26,6 +26,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+/**
+ * 实现 PooledByteBuf 抽象类，基于 ByteBuffer + Unsafe 的可重用 ByteBuf 实现类。所以，泛型 T 为 ByteBuffer.
+ *  - 它是  PooledDirectByteBuf 对应的基于 Unsafe 版本的实现类
+ *  - 直接操作内存地址
+ */
 final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
     private static final ObjectPool<PooledUnsafeDirectByteBuf> RECYCLER = ObjectPool.newPool(
             new ObjectCreator<PooledUnsafeDirectByteBuf>() {
@@ -41,6 +46,9 @@ final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
         return buf;
     }
 
+    /**
+     * 内存地址
+     */
     private long memoryAddress;
 
     private PooledUnsafeDirectByteBuf(Handle<PooledUnsafeDirectByteBuf> recyclerHandle, int maxCapacity) {
@@ -50,17 +58,22 @@ final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
     @Override
     void init(PoolChunk<ByteBuffer> chunk, ByteBuffer nioBuffer,
               long handle, int offset, int length, int maxLength, PoolThreadCache cache) {
+        // 调用父初始化方法
         super.init(chunk, nioBuffer, handle, offset, length, maxLength, cache);
+        // 初始化内存地址
         initMemoryAddress();
     }
 
     @Override
     void initUnpooled(PoolChunk<ByteBuffer> chunk, int length) {
+        // 调用父初始化方法
         super.initUnpooled(chunk, length);
+        // 初始化内存地址
         initMemoryAddress();
     }
 
     private void initMemoryAddress() {
+        //初始化内存地址
         memoryAddress = PlatformDependent.directBufferAddress(memory) + offset;
     }
 
@@ -248,6 +261,7 @@ final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
 
     @Override
     protected SwappedByteBuf newSwappedByteBuf() {
+        // 支持
         if (PlatformDependent.isUnaligned()) {
             // Only use if unaligned access is supported otherwise there is no gain.
             return new UnsafeDirectSwappedByteBuf(this);

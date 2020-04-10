@@ -646,6 +646,7 @@ public final class Unpooled {
     }
 
     /**
+     * 转化成只读 Buffer 对象
      * Creates a read-only buffer which disallows any modification operations
      * on the specified {@code buffer}.  The new buffer has the same
      * {@code readerIndex} and {@code writerIndex} with the specified
@@ -655,11 +656,14 @@ public final class Unpooled {
      */
     @Deprecated
     public static ByteBuf unmodifiableBuffer(ByteBuf buffer) {
+        //获取 buffer 的字节序
         ByteOrder endianness = buffer.order();
+        //大端流
         if (endianness == BIG_ENDIAN) {
             return new ReadOnlyByteBuf(buffer);
         }
 
+        //小端流
         return new ReadOnlyByteBuf(buffer.order(BIG_ENDIAN)).order(LITTLE_ENDIAN);
     }
 

@@ -23,12 +23,18 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 /**
+ * 实现 AbstractReferenceCountedByteBuf 抽象类，对应 PooledUnsafeDirectByteBuf 的非池化 ByteBuf 实现类。
+ *  - 通过直接操作直接内存 ByteBuffer 的内存地址来操作
+ *  - 先创建直接内存 ByteBuffer 再获取它的内存地址来操作
  * A NIO {@link ByteBuffer} based buffer. It is recommended to use
  * {@link UnpooledByteBufAllocator#directBuffer(int, int)}, {@link Unpooled#directBuffer(int)} and
  * {@link Unpooled#wrappedBuffer(ByteBuffer)} instead of calling the constructor explicitly.}
  */
 public class UnpooledUnsafeDirectByteBuf extends UnpooledDirectByteBuf {
 
+    /**
+     * 内存地址
+     */
     long memoryAddress;
 
     /**
@@ -66,6 +72,7 @@ public class UnpooledUnsafeDirectByteBuf extends UnpooledDirectByteBuf {
     @Override
     final void setByteBuffer(ByteBuffer buffer, boolean tryFree) {
         super.setByteBuffer(buffer, tryFree);
+        //获取 byteBuffer 的内存地址
         memoryAddress = PlatformDependent.directBufferAddress(buffer);
     }
 

@@ -16,21 +16,25 @@
 package io.netty.buffer;
 
 /**
+ * Chunk 的统计信息接口
  * Metrics for a chunk.
  */
 public interface PoolChunkMetric {
 
     /**
+     * 返回已使用的百分比
      * Return the percentage of the current usage of the chunk.
      */
     int usage();
 
     /**
+     * 返回 Chunk 的字节数
      * Return the size of the chunk in bytes, this is the maximum of bytes that can be served out of the chunk.
      */
     int chunkSize();
 
     /**
+     * 返回 Chunk 没分配的字节数
      * Return the number of free bytes in the chunk.
      */
     int freeBytes();

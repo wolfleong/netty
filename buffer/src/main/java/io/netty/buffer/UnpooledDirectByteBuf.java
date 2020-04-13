@@ -32,7 +32,7 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 
 /**
  * 实现 AbstractReferenceCountedByteBuf 抽象类，对应  PooledDirectByteBuf 的非池化 ByteBuf 实现类。
- *
+ * - 通过使用直接缓存 java.nio.ByteBuffer 的 api 来实现的
  * A NIO {@link ByteBuffer} based buffer. It is recommended to use
  * {@link UnpooledByteBufAllocator#directBuffer(int, int)}, {@link Unpooled#directBuffer(int)} and
  * {@link Unpooled#wrappedBuffer(ByteBuffer)} instead of calling the constructor explicitly.
@@ -45,7 +45,7 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
     private final ByteBufAllocator alloc;
 
     /**
-     * 数据 ByteBuffer 对象
+     * 直接缓存的 ByteBuffer 对象
      */
     ByteBuffer buffer; // accessed by UnpooledUnsafeNoCleanerDirectByteBuf.reallocateDirect()
     /**
@@ -129,6 +129,7 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
     }
 
     /**
+     * 创建一个直接内存的 ByteBuffer
      * Allocate a new direct {@link ByteBuffer} with the given initialCapacity.
      */
     protected ByteBuffer allocateDirect(int initialCapacity) {

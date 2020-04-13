@@ -16,6 +16,7 @@
 package io.netty.buffer;
 
 /**
+ * PoolChunkList的相关信息
  * Metrics for a list of chunks.
  */
 public interface PoolChunkListMetric extends Iterable<PoolChunkMetric> {

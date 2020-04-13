@@ -22,15 +22,26 @@ import io.netty.util.internal.StringUtil;
 import java.nio.ByteBuffer;
 
 /**
+ * 实现 ByteBufAllocatorMetricProvider 接口，继承 AbstractByteBufAllocator 抽象类，普通的 ByteBuf 的分配器，不基于内存池。
  * Simplistic {@link ByteBufAllocator} implementation that does not pool anything.
  */
 public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator implements ByteBufAllocatorMetricProvider {
 
+    /**
+     * Metric
+     */
     private final UnpooledByteBufAllocatorMetric metric = new UnpooledByteBufAllocatorMetric();
+    /**
+     * 是否禁用内存泄露检测功能
+     */
     private final boolean disableLeakDetector;
+    /**
+     * 不使用 `io.netty.util.internal.Cleaner` 释放 Direct ByteBuf
+     */
     private final boolean noCleaner;
 
     /**
+     * 默认实例
      * Default instance which uses leak-detection for direct buffers.
      */
     public static final UnpooledByteBufAllocator DEFAULT =
@@ -119,20 +130,26 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
     }
 
     void incrementDirect(int amount) {
+        // 增加 Direct
         metric.directCounter.add(amount);
     }
 
     void decrementDirect(int amount) {
+        // 减少 Direct
         metric.directCounter.add(-amount);
     }
 
     void incrementHeap(int amount) {
+        // 增加 Heap
         metric.heapCounter.add(amount);
     }
 
     void decrementHeap(int amount) {
+        // 减少 Heap
         metric.heapCounter.add(-amount);
     }
+
+    //因为要和 Metric 结合，所以通过继承的方式，进行增强。
 
     private static final class InstrumentedUnpooledUnsafeHeapByteBuf extends UnpooledUnsafeHeapByteBuf {
         InstrumentedUnpooledUnsafeHeapByteBuf(UnpooledByteBufAllocator alloc, int initialCapacity, int maxCapacity) {
@@ -141,6 +158,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
 
         @Override
         protected byte[] allocateArray(int initialCapacity) {
+            //分配数组时, 增加 incrementHeap
             byte[] bytes = super.allocateArray(initialCapacity);
             ((UnpooledByteBufAllocator) alloc()).incrementHeap(bytes.length);
             return bytes;
@@ -148,6 +166,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
 
         @Override
         protected void freeArray(byte[] array) {
+            //释放数组时, 减少内存统计
             int length = array.length;
             super.freeArray(array);
             ((UnpooledByteBufAllocator) alloc()).decrementHeap(length);
@@ -247,7 +266,13 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
     }
 
     private static final class UnpooledByteBufAllocatorMetric implements ByteBufAllocatorMetric {
+        /**
+         * Direct ByteBuf 占用内存大小
+         */
         final LongCounter directCounter = PlatformDependent.newLongCounter();
+        /**
+         * Heap ByteBuf 占用内存大小
+         */
         final LongCounter heapCounter = PlatformDependent.newLongCounter();
 
         @Override

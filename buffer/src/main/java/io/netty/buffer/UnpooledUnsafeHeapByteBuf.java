@@ -18,6 +18,8 @@ package io.netty.buffer;
 import io.netty.util.internal.PlatformDependent;
 
 /**
+ * 实现 AbstractReferenceCountedByteBuf 抽象类，对应  PooledUnsafeHeapByteBuf 的非池化 ByteBuf 实现类。
+ *  - 用 Unsafe 来操作数组实现
  * Big endian Java heap buffer implementation. It is recommended to use
  * {@link UnpooledByteBufAllocator#heapBuffer(int, int)}, {@link Unpooled#buffer(int)} and
  * {@link Unpooled#wrappedBuffer(byte[])} instead of calling the constructor explicitly.

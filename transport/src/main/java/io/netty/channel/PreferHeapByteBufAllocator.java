@@ -22,11 +22,15 @@ import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.UnstableApi;
 
 /**
+ * 实现 ByteBufAllocator 接口，倾向创建 Heap ByteBuf 的分配器。
  * Wraps another {@link ByteBufAllocator} and use heapbuffers everywhere except when a direct buffer is explicit
  * requested.
  */
 @UnstableApi
 public final class PreferHeapByteBufAllocator implements ByteBufAllocator {
+    /**
+     * 真正的分配器对象
+     */
     private final ByteBufAllocator allocator;
 
     public PreferHeapByteBufAllocator(ByteBufAllocator allocator) {

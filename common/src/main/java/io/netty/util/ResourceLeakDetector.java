@@ -40,23 +40,36 @@ import static io.netty.util.internal.StringUtil.EMPTY_STRING;
 import static io.netty.util.internal.StringUtil.NEWLINE;
 import static io.netty.util.internal.StringUtil.simpleClassName;
 
+/**
+ * 内存泄露检测器
+ */
 public class ResourceLeakDetector<T> {
 
     private static final String PROP_LEVEL_OLD = "io.netty.leakDetectionLevel";
     private static final String PROP_LEVEL = "io.netty.leakDetection.level";
+    /**
+     * 默认内存检测级别
+     */
     private static final Level DEFAULT_LEVEL = Level.SIMPLE;
 
     private static final String PROP_TARGET_RECORDS = "io.netty.leakDetection.targetRecords";
     private static final int DEFAULT_TARGET_RECORDS = 4;
 
     private static final String PROP_SAMPLING_INTERVAL = "io.netty.leakDetection.samplingInterval";
+    /**
+     * 默认采集频率
+     */
     // There is a minor performance benefit in TLR if this is a power of 2.
     private static final int DEFAULT_SAMPLING_INTERVAL = 128;
 
+    /**
+     * 每个 DefaultResourceLeak 记录的 Record 数量
+     */
     private static final int TARGET_RECORDS;
     static final int SAMPLING_INTERVAL;
 
     /**
+     * 内存检测级别枚举
      * Represents the level of resource leak detection.
      */
     public enum Level {
@@ -97,11 +110,15 @@ public class ResourceLeakDetector<T> {
         }
     }
 
+    /**
+     * 内存泄露检测等级
+     */
     private static Level level;
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ResourceLeakDetector.class);
 
     static {
+        // 获得是否禁用泄露检测
         final boolean disabled;
         if (SystemPropertyUtil.get("io.netty.noResourceLeakDetection") != null) {
             disabled = SystemPropertyUtil.getBoolean("io.netty.noResourceLeakDetection", false);
@@ -113,15 +130,20 @@ public class ResourceLeakDetector<T> {
             disabled = false;
         }
 
+        // 获得默认级别
         Level defaultLevel = disabled? Level.DISABLED : DEFAULT_LEVEL;
 
+        // 获得配置的级别字符串，从老版本的配置
         // First read old property name
         String levelStr = SystemPropertyUtil.get(PROP_LEVEL_OLD, defaultLevel.name());
 
+        // 获得配置的级别字符串，从新版本的配置
         // If new property name is present, use it
         levelStr = SystemPropertyUtil.get(PROP_LEVEL, levelStr);
+        // 获得最终的级别
         Level level = Level.parseLevel(levelStr);
 
+        // 初始化 TARGET_RECORDS
         TARGET_RECORDS = SystemPropertyUtil.getInt(PROP_TARGET_RECORDS, DEFAULT_TARGET_RECORDS);
         SAMPLING_INTERVAL = SystemPropertyUtil.getInt(PROP_SAMPLING_INTERVAL, DEFAULT_SAMPLING_INTERVAL);
 
@@ -161,15 +183,28 @@ public class ResourceLeakDetector<T> {
         return level;
     }
 
+    //DefaultResourceLeak 集合
     /** the collection of active resources */
     private final Set<DefaultResourceLeak<?>> allLeaks =
             Collections.newSetFromMap(new ConcurrentHashMap<DefaultResourceLeak<?>, Boolean>());
 
+    /**
+     * 引用队列
+     */
     private final ReferenceQueue<Object> refQueue = new ReferenceQueue<Object>();
+    /**
+     * 已汇报的内存泄露的资源类型的集合
+     */
     private final Set<String> reportedLeaks =
             Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
+    /**
+     * 资源类型
+     */
     private final String resourceType;
+    /**
+     * 采集评率
+     */
     private final int samplingInterval;
 
     /**
@@ -246,30 +281,48 @@ public class ResourceLeakDetector<T> {
         return track0(obj);
     }
 
+    /**
+     * 给指定资源( 例如 ByteBuf 对象 )创建一个检测它是否泄漏的 ResourceLeakTracker 对象
+     */
     @SuppressWarnings("unchecked")
     private DefaultResourceLeak track0(T obj) {
         Level level = ResourceLeakDetector.level;
+        // DISABLED 级别，不创建
         if (level == Level.DISABLED) {
             return null;
         }
 
+        // SIMPLE 和 ADVANCED
         if (level.ordinal() < Level.PARANOID.ordinal()) {
+            // 随机
             if ((PlatformDependent.threadLocalRandom().nextInt(samplingInterval)) == 0) {
+                // 汇报内存是否泄漏
                 reportLeak();
+                // 创建 DefaultResourceLeak 对象
                 return new DefaultResourceLeak(obj, refQueue, allLeaks);
             }
             return null;
         }
+        // PARANOID 级别
+        // 汇报内存是否泄漏
         reportLeak();
+        // 创建 DefaultResourceLeak 对象
         return new DefaultResourceLeak(obj, refQueue, allLeaks);
     }
 
+    /**
+     * 清空引用队列
+     */
     private void clearRefQueue() {
+        //自旋
         for (;;) {
+            //获取队列元素
             DefaultResourceLeak ref = (DefaultResourceLeak) refQueue.poll();
+            // null 则直接出出
             if (ref == null) {
                 break;
             }
+            //非空则销毁
             ref.dispose();
         }
     }
@@ -281,27 +334,36 @@ public class ResourceLeakDetector<T> {
      * @return {@code true} to enable leak reporting.
      */
     protected boolean needReport() {
+        //日志级别是否为 Error 类型
         return logger.isErrorEnabled();
     }
 
     private void reportLeak() {
+        // 如果不允许打印错误日志，则无法汇报，清理队列，并直接结束。
         if (!needReport()) {
+            // 清理队列
             clearRefQueue();
             return;
         }
 
+        // 循环引用队列，直到为空
         // Detect and report previous leaks.
         for (;;) {
+            //从队列获取引用对象
             DefaultResourceLeak ref = (DefaultResourceLeak) refQueue.poll();
+            // null 则退出
             if (ref == null) {
                 break;
             }
 
+            // 清理，并返回是否内存泄露
             if (!ref.dispose()) {
                 continue;
             }
 
+            // 获得 Record 日志
             String records = ref.toString();
+            // 相同 Record 日志，只汇报一次
             if (reportedLeaks.add(records)) {
                 if (records.isEmpty()) {
                     reportUntracedLeak(resourceType);
@@ -343,26 +405,49 @@ public class ResourceLeakDetector<T> {
     protected void reportInstancesLeak(String resourceType) {
     }
 
+    /**
+     * DefaultResourceLeak ，继承 java.lang.ref.WeakReference 类，实现 ResourceLeakTracker 接口，默认 ResourceLeakTracker 实现类
+     */
     @SuppressWarnings("deprecation")
     private static final class DefaultResourceLeak<T>
             extends WeakReference<Object> implements ResourceLeakTracker<T>, ResourceLeak {
 
+        /**
+         * {@link #head} 的更新器
+         */
         @SuppressWarnings("unchecked") // generics and updaters do not mix.
         private static final AtomicReferenceFieldUpdater<DefaultResourceLeak<?>, Record> headUpdater =
                 (AtomicReferenceFieldUpdater)
                         AtomicReferenceFieldUpdater.newUpdater(DefaultResourceLeak.class, Record.class, "head");
 
+        /**
+         * {@link #droppedRecords} 的更新器
+         */
         @SuppressWarnings("unchecked") // generics and updaters do not mix.
         private static final AtomicIntegerFieldUpdater<DefaultResourceLeak<?>> droppedRecordsUpdater =
                 (AtomicIntegerFieldUpdater)
                         AtomicIntegerFieldUpdater.newUpdater(DefaultResourceLeak.class, "droppedRecords");
 
+        /**
+         * Record 链的头节点
+         * 看完 {@link #record()} 方法后，实际上，head 是尾节点，即最后( 新 )的一条 Record 。
+         */
         @SuppressWarnings("unused")
         private volatile Record head;
+        /**
+         * 丢弃的 Record 计数
+         */
         @SuppressWarnings("unused")
         private volatile int droppedRecords;
 
+        /**
+         * DefaultResourceLeak 集合。来自 {@link ResourceLeakDetector#allLeaks}
+         */
         private final Set<DefaultResourceLeak<?>> allLeaks;
+        /**
+         *  hash 值
+         *  保证 {@link #close(Object)} 传入的对象，就是 {@link #referent} 对象
+         */
         private final int trackedHash;
 
         DefaultResourceLeak(
@@ -427,49 +512,67 @@ public class ResourceLeakDetector<T> {
                 Record newHead;
                 boolean dropped;
                 do {
+                    // 已经关闭，则返回
                     if ((prevHead = oldHead = headUpdater.get(this)) == null) {
                         // already closed.
                         return;
                     }
+                    // 当超过 TARGET_RECORDS 数量时，随机丢到头节点。
                     final int numElements = oldHead.pos + 1;
                     if (numElements >= TARGET_RECORDS) {
+                        //丢弃因子
                         final int backOffFactor = Math.min(numElements - TARGET_RECORDS, 30);
+                        //随机是否丢弃
                         if (dropped = PlatformDependent.threadLocalRandom().nextInt(1 << backOffFactor) != 0) {
                             prevHead = oldHead.next;
                         }
                     } else {
                         dropped = false;
                     }
+                    // 创建新的头节点
                     newHead = hint != null ? new Record(prevHead, hint) : new Record(prevHead);
                 } while (!headUpdater.compareAndSet(this, oldHead, newHead));
+                // 若丢弃，增加 droppedRecordsUpdater 计数
                 if (dropped) {
                     droppedRecordsUpdater.incrementAndGet(this);
                 }
             }
         }
 
+        /**
+         * 清理，并返回是否内存泄露
+         */
         boolean dispose() {
+            // 清理 referent 的引用
             clear();
+            // 移除出 allLeaks 。移除成功，意味着内存泄露。
             return allLeaks.remove(this);
         }
 
         @Override
         public boolean close() {
+            // 移除出 allLeaks
             if (allLeaks.remove(this)) {
                 // Call clear so the reference is not even enqueued.
+                // 清理 referent 的引用
                 clear();
+                // 置空 head
                 headUpdater.set(this, null);
+                // 返回成功
                 return true;
             }
+            // 返回失败
             return false;
         }
 
         @Override
         public boolean close(T trackedObject) {
+            // 校验一致
             // Ensure that the object that was tracked is the same as the one that was passed to close(...).
             assert trackedHash == System.identityHashCode(trackedObject);
 
             try {
+                // 关闭
                 return close();
             } finally {
                 // This method will do `synchronized(trackedObject)` and we should be sure this will not cause deadlock.
@@ -509,7 +612,9 @@ public class ResourceLeakDetector<T> {
 
         @Override
         public String toString() {
+            // 获得 head 属性，并置空
             Record oldHead = headUpdater.getAndSet(this, null);
+            // 若为空，说明已经关闭。
             if (oldHead == null) {
                 // Already closed
                 return EMPTY_STRING;
@@ -523,10 +628,12 @@ public class ResourceLeakDetector<T> {
             StringBuilder buf = new StringBuilder(present * 2048).append(NEWLINE);
             buf.append("Recent access records: ").append(NEWLINE);
 
+            // 拼接 Record 练
             int i = 1;
             Set<String> seen = new HashSet<String>(present);
             for (; oldHead != Record.BOTTOM; oldHead = oldHead.next) {
                 String s = oldHead.toString();
+                // 是否重复
                 if (seen.add(s)) {
                     if (oldHead.next == Record.BOTTOM) {
                         buf.append("Created at:").append(NEWLINE).append(s);
@@ -538,6 +645,7 @@ public class ResourceLeakDetector<T> {
                 }
             }
 
+            // 拼接 duped ( 重复 ) 次数
             if (duped > 0) {
                 buf.append(": ")
                         .append(duped)
@@ -545,6 +653,7 @@ public class ResourceLeakDetector<T> {
                         .append(NEWLINE);
             }
 
+            // 拼接 dropped (丢弃) 次数
             if (dropped > 0) {
                 buf.append(": ")
                    .append(dropped)
@@ -561,40 +670,72 @@ public class ResourceLeakDetector<T> {
         }
     }
 
+    /**
+     * 忽略的方法集合
+     */
     private static final AtomicReference<String[]> excludedMethods =
             new AtomicReference<String[]>(EmptyArrays.EMPTY_STRINGS);
 
+    /**
+     * 添加忽略方法的集合
+     */
     public static void addExclusions(Class clz, String ... methodNames) {
+        //创建类的方法名集合, 用于删除
         Set<String> nameSet = new HashSet<String>(Arrays.asList(methodNames));
         // Use loop rather than lookup. This avoids knowing the parameters, and doesn't have to handle
         // NoSuchMethodException.
+        //遍历
         for (Method method : clz.getDeclaredMethods()) {
+            //删除成功且直到 nameSet 为空才退出
             if (nameSet.remove(method.getName()) && nameSet.isEmpty()) {
                 break;
             }
         }
+        //如果非空则有不存在的方法名
         if (!nameSet.isEmpty()) {
             throw new IllegalArgumentException("Can't find '" + nameSet + "' in " + clz.getName());
         }
         String[] oldMethods;
         String[] newMethods;
         do {
+            //获取旧的方法集合
             oldMethods = excludedMethods.get();
+            //扩容
             newMethods = Arrays.copyOf(oldMethods, oldMethods.length + 2 * methodNames.length);
+            //遍历新添加的方法名
             for (int i = 0; i < methodNames.length; i++) {
+                //偶数位放类名
                 newMethods[oldMethods.length + i * 2] = clz.getName();
+                //基数位放方法名
                 newMethods[oldMethods.length + i * 2 + 1] = methodNames[i];
             }
+            //cas 以替换成功
         } while (!excludedMethods.compareAndSet(oldMethods, newMethods));
     }
 
+    /**
+     * Record ，记录。每次调用 ResourceLeakTracker#touch(...) 方法后，会产生响应的 Record 对象
+     * - 链表结构
+     */
     private static final class Record extends Throwable {
         private static final long serialVersionUID = 6065153674892850720L;
 
+        /**
+         * 尾节点的单例
+         */
         private static final Record BOTTOM = new Record();
 
+        /**
+         * hint 字符串
+         */
         private final String hintString;
+        /**
+         * 下一个节点
+         */
         private final Record next;
+        /**
+         * 位置
+         */
         private final int pos;
 
         Record(Record next, Object hint) {
@@ -630,6 +771,7 @@ public class ResourceLeakDetector<T> {
             out: for (int i = 3; i < array.length; i++) {
                 StackTraceElement element = array[i];
                 // Strip the noisy stack trace elements.
+                // 跳过忽略的方法
                 String[] exclusions = excludedMethods.get();
                 for (int k = 0; k < exclusions.length; k += 2) {
                     if (exclusions[k].equals(element.getClassName())

@@ -31,14 +31,25 @@ import java.nio.channels.ScatteringByteChannel;
 import static io.netty.util.internal.ObjectUtil.checkNotNull;
 
 /**
+ * 实现 AbstractReferenceCountedByteBuf 抽象类，对应 PooledHeapByteBuf 的非池化 ByteBuf 实现类。
+ * - 基于数组实现的, 直接操作数组实现
  * Big endian Java heap buffer implementation. It is recommended to use
  * {@link UnpooledByteBufAllocator#heapBuffer(int, int)}, {@link Unpooled#buffer(int)} and
  * {@link Unpooled#wrappedBuffer(byte[])} instead of calling the constructor explicitly.
  */
 public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
 
+    /**
+     * ByteBuf 分配器对象
+     */
     private final ByteBufAllocator alloc;
+    /**
+     * 字节数组
+     */
     byte[] array;
+    /**
+     * 临时 ByteBuff 对象
+     */
     private ByteBuffer tmpNioBuf;
 
     /**
@@ -48,6 +59,7 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
      * @param maxCapacity the max capacity of the underlying byte array
      */
     public UnpooledHeapByteBuf(ByteBufAllocator alloc, int initialCapacity, int maxCapacity) {
+        // 设置最大容量
         super(maxCapacity);
 
         if (initialCapacity > maxCapacity) {
@@ -56,7 +68,9 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
         }
 
         this.alloc = checkNotNull(alloc, "alloc");
+        // 创建并设置字节数组
         setArray(allocateArray(initialCapacity));
+        // 设置读写索引
         setIndex(0, 0);
     }
 
@@ -67,6 +81,7 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
      * @param maxCapacity the max capacity of the underlying byte array
      */
     protected UnpooledHeapByteBuf(ByteBufAllocator alloc, byte[] initialArray, int maxCapacity) {
+        // 设置最大容量
         super(maxCapacity);
 
         checkNotNull(alloc, "alloc");
@@ -77,7 +92,9 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
         }
 
         this.alloc = alloc;
+        // 设置字节数组
         setArray(initialArray);
+        // 设置读写索引
         setIndex(0, initialArray.length);
     }
 
@@ -111,28 +128,37 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
 
     @Override
     public int capacity() {
+        //字节数组的大小，作为当前容量上限。
         return array.length;
     }
 
     @Override
     public ByteBuf capacity(int newCapacity) {
+        // 校验新的容量，不能超过最大容量
         checkNewCapacity(newCapacity);
         byte[] oldArray = array;
         int oldCapacity = oldArray.length;
+        //容量不变
         if (newCapacity == oldCapacity) {
             return this;
         }
 
         int bytesToCopy;
+        //扩容
         if (newCapacity > oldCapacity) {
             bytesToCopy = oldCapacity;
+            //缩容
         } else {
             trimIndicesToCapacity(newCapacity);
             bytesToCopy = newCapacity;
         }
+        //重新分配数组
         byte[] newArray = allocateArray(newCapacity);
+        //复制数据
         System.arraycopy(oldArray, 0, newArray, 0, bytesToCopy);
+        //设置
         setArray(newArray);
+        //释放旧数组
         freeArray(oldArray);
         return this;
     }
@@ -545,7 +571,9 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
 
     @Override
     protected void deallocate() {
+        // 释放老数组
         freeArray(array);
+        // 设置为空字节数组
         array = EmptyArrays.EMPTY_BYTES;
     }
 

@@ -28,6 +28,10 @@ import java.nio.channels.ScatteringByteChannel;
 
 /**
  * 继承 AbstractReferenceCountedByteBuf 抽象类，对象池化的 ByteBuf 抽象基类，为基于对象池的 ByteBuf 实现类，提供公用的方法。
+ * - 这里的池的实现很有意思, 一般的池的实现是池对象的操作是直接调用非池对象的api 来实现操作, 如 PooledDirectByteBuf.getInt 会直接调用 UnPooledDirectByteBuf.getInt 的 api, 以达到代码重用,
+ *   但这里的池实现有点不一样, 池对象只重用非池对象的创建过程, 对于操作还是用非池对象的底层, 也就是又写了一份操作代码, 如 PooledDirectByteBuf 是直接通过
+ *   UnPooledDirectByteBuf 的底层 ByteBuffer 来实现操作的, 少了一层封装性能会好吗 ?
+ *
  */
 abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
 

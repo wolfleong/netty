@@ -49,6 +49,7 @@ public final class MathUtil {
      * </ul>
      */
     public static int safeFindNextPositivePowerOfTwo(final int value) {
+        //0x40000000 相当于 1 << 30
         return value <= 0 ? 1 : value >= 0x40000000 ? 0x40000000 : findNextPositivePowerOfTwo(value);
     }
 

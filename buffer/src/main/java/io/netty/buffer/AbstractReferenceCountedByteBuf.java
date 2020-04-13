@@ -21,14 +21,27 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import io.netty.util.internal.ReferenceCountUpdater;
 
 /**
+ * 实现引用计数的获取与增减的操作
  * Abstract base class for {@link ByteBuf} implementations that count references.
  */
 public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
+    /**
+     * refCnt 的偏移量
+     */
     private static final long REFCNT_FIELD_OFFSET =
             ReferenceCountUpdater.getUnsafeOffset(AbstractReferenceCountedByteBuf.class, "refCnt");
+    /**
+     * {@link #refCnt} 字段的原子更新器
+     *
+     * 计数器基于 AtomicIntegerFieldUpdater ，为什么不直接用 AtomicInteger ？
+     * 因为 ByteBuf 对象很多，如果都把 int 包一层 AtomicInteger 花销较大，而AtomicIntegerFieldUpdater 只需要一个全局的静态变量。
+     */
     private static final AtomicIntegerFieldUpdater<AbstractReferenceCountedByteBuf> AIF_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(AbstractReferenceCountedByteBuf.class, "refCnt");
 
+    /**
+     * refCnt 更新对象, 抽象了更新的逻辑
+     */
     private static final ReferenceCountUpdater<AbstractReferenceCountedByteBuf> updater =
             new ReferenceCountUpdater<AbstractReferenceCountedByteBuf>() {
         @Override
@@ -41,11 +54,15 @@ public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
         }
     };
 
+    /**
+     * 引用计数
+     */
     // Value might not equal "real" reference count, all access should be via the updater
     @SuppressWarnings("unused")
     private volatile int refCnt = updater.initialValue();
 
     protected AbstractReferenceCountedByteBuf(int maxCapacity) {
+        // 设置最大容量
         super(maxCapacity);
     }
 
@@ -87,11 +104,13 @@ public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
 
     @Override
     public ByteBuf touch() {
+        //此类未实现
         return this;
     }
 
     @Override
     public ByteBuf touch(Object hint) {
+        //此类未实现
         return this;
     }
 
@@ -106,6 +125,7 @@ public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
     }
 
     private boolean handleRelease(boolean result) {
+        //如果已经释放, 则回收
         if (result) {
             deallocate();
         }

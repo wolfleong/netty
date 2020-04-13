@@ -24,12 +24,23 @@ import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.StringUtil;
 
 /**
+ * 实现 ByteBufAllocator 接口，ByteBufAllocator 抽象实现类，
+ * 为 PooledByteBufAllocator 和 UnpooledByteBufAllocator 提供公共的方法。
  * Skeletal {@link ByteBufAllocator} implementation to extend.
  */
 public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
+    /**
+     * 默认容量大小
+     */
     static final int DEFAULT_INITIAL_CAPACITY = 256;
+    /**
+     * 默认最大容量大小，无限。
+     */
     static final int DEFAULT_MAX_CAPACITY = Integer.MAX_VALUE;
     static final int DEFAULT_MAX_COMPONENTS = 16;
+    /**
+     * 扩容分界线，4M
+     */
     static final int CALCULATE_THRESHOLD = 1048576 * 4; // 4 MiB page
 
     static {
@@ -80,7 +91,13 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
         return buf;
     }
 
+    /**
+     * 是否倾向创建 Direct ByteBuf
+     */
     private final boolean directByDefault;
+    /**
+     * 空 ByteBuf 缓存
+     */
     private final ByteBuf emptyBuf;
 
     /**
@@ -103,6 +120,7 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
 
     @Override
     public ByteBuf buffer() {
+        //如果默认创建直接缓存
         if (directByDefault) {
             return directBuffer();
         }
@@ -180,6 +198,7 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
 
     @Override
     public ByteBuf directBuffer(int initialCapacity, int maxCapacity) {
+        //处理空 Buf 的情况
         if (initialCapacity == 0 && maxCapacity == 0) {
             return emptyBuf;
         }
@@ -233,11 +252,13 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
     }
 
     /**
+     * 创建堆 ByteBuf
      * Create a heap {@link ByteBuf} with the given initialCapacity and maxCapacity.
      */
     protected abstract ByteBuf newHeapBuffer(int initialCapacity, int maxCapacity);
 
     /**
+     * 创建直接内存 ByteBuf
      * Create a direct {@link ByteBuf} with the given initialCapacity and maxCapacity.
      */
     protected abstract ByteBuf newDirectBuffer(int initialCapacity, int maxCapacity);
@@ -257,12 +278,15 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
         }
         final int threshold = CALCULATE_THRESHOLD; // 4 MiB page
 
+        //等于 threshold ，直接返回 threshold 。
         if (minNewCapacity == threshold) {
             return threshold;
         }
 
         // If over threshold, do not double but just increase by threshold.
+        //超过 threshold ，增加 threshold ，不超过 maxCapacity 大小。
         if (minNewCapacity > threshold) {
+            //这里保证了 newCapacity 是 threshold 的倍数
             int newCapacity = minNewCapacity / threshold * threshold;
             if (newCapacity > maxCapacity - threshold) {
                 newCapacity = maxCapacity;
@@ -273,6 +297,7 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
         }
 
         // Not over threshold. Double up to 4 MiB, starting from 64.
+        //未超过 threshold ，从 64 开始两倍计算，不超过 4M 大小。
         int newCapacity = 64;
         while (newCapacity < minNewCapacity) {
             newCapacity <<= 1;

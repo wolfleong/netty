@@ -30,6 +30,7 @@ import io.netty.channel.ChannelHandlerMask.Skip;
  * method returns automatically. If you are looking for a {@link ChannelInboundHandler} implementation that
  * releases the received messages automatically, please see {@link SimpleChannelInboundHandler}.
  * </p>
+ * 实现 ChannelInboundHandler 接口，继承 ChannelHandlerAdapter 抽象类，ChannelInboundHandler Adapter 实现类。
  */
 public class ChannelInboundHandlerAdapter extends ChannelHandlerAdapter implements ChannelInboundHandler {
 

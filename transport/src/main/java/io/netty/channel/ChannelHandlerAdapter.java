@@ -22,14 +22,19 @@ import io.netty.util.internal.InternalThreadLocalMap;
 import java.util.Map;
 
 /**
+ * ChannelHandler 骨架类
  * Skeleton implementation of a {@link ChannelHandler}.
  */
 public abstract class ChannelHandlerAdapter implements ChannelHandler {
 
+    /**
+     * 是否已经初始化
+     */
     // Not using volatile because it's used only for a sanity check.
     boolean added;
 
     /**
+     * 确保非共享
      * Throws {@link IllegalStateException} if {@link ChannelHandlerAdapter#isSharable()} returns {@code true}
      */
     protected void ensureNotSharable() {

@@ -20,6 +20,9 @@ import io.netty.channel.ChannelHandlerMask.Skip;
 import java.net.SocketAddress;
 
 /**
+ * 实现 ChannelOutboundHandler 接口，继承 ChannelInboundHandlerAdapter 抽象类，Channel Duplex Handler 实现类，
+ * 支持对 Inbound 和 Outbound 事件的 Adaptive 处理，所以命名上带有“Duplex”( 双重 )
+ *
  * {@link ChannelHandler} implementation which represents a combination out of a {@link ChannelInboundHandler} and
  * the {@link ChannelOutboundHandler}.
  *

@@ -19,6 +19,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.TypeParameterMatcher;
 
 /**
+ * 继承 ChannelInboundHandlerAdapter 类，抽象类，处理指定事件的消息。
  * {@link ChannelInboundHandlerAdapter} which allows to conveniently only handle a specific type of user events.
  *
  * For example, here is an implementation which only handle {@link String} user events.
@@ -91,17 +92,23 @@ public abstract class SimpleUserEventChannelHandler<I> extends ChannelInboundHan
 
     @Override
     public final void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        // 是否要释放消息
         boolean release = true;
         try {
+            // 判断是否为匹配的消息
             if (acceptEvent(evt)) {
                 @SuppressWarnings("unchecked")
                 I ievt = (I) evt;
+                // 处理消息
                 eventReceived(ctx, ievt);
             } else {
+                // 不需要释放消息
                 release = false;
+                // 触发 Channel Read 到下一个节点
                 ctx.fireUserEventTriggered(evt);
             }
         } finally {
+            // 判断，是否要释放消息
             if (autoRelease && release) {
                 ReferenceCountUtil.release(evt);
             }

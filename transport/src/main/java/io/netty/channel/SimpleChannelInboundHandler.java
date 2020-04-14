@@ -19,6 +19,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.TypeParameterMatcher;
 
 /**
+ * 继承 ChannelInboundHandlerAdapter 类，抽象类，处理指定类型的消息。应用程序中，我们可以实现 SimpleChannelInboundHandler 后，实现对指定类型的消息的自定义处理。
  * {@link ChannelInboundHandlerAdapter} which allows to explicit only handle a specific type of messages.
  *
  * For example here is an implementation which only handle {@link String} messages.
@@ -41,7 +42,15 @@ import io.netty.util.internal.TypeParameterMatcher;
  */
 public abstract class SimpleChannelInboundHandler<I> extends ChannelInboundHandlerAdapter {
 
+    /**
+     * 类型匹配器
+     */
     private final TypeParameterMatcher matcher;
+    /**
+     * 使用完消息，是否自动释放
+     *
+     * @see #channelRead(ChannelHandlerContext, Object)
+     */
     private final boolean autoRelease;
 
     /**
@@ -58,6 +67,7 @@ public abstract class SimpleChannelInboundHandler<I> extends ChannelInboundHandl
      *                      {@link ReferenceCountUtil#release(Object)}.
      */
     protected SimpleChannelInboundHandler(boolean autoRelease) {
+        // 获得 matcher
         matcher = TypeParameterMatcher.find(this, SimpleChannelInboundHandler.class, "I");
         this.autoRelease = autoRelease;
     }
@@ -102,6 +112,7 @@ public abstract class SimpleChannelInboundHandler<I> extends ChannelInboundHandl
                 ctx.fireChannelRead(msg);
             }
         } finally {
+            // 判断，是否要释放消息
             if (autoRelease && release) {
                 ReferenceCountUtil.release(msg);
             }

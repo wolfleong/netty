@@ -193,7 +193,7 @@ public class ResourceLeakDetector<T> {
      */
     private final ReferenceQueue<Object> refQueue = new ReferenceQueue<Object>();
     /**
-     * 已汇报的内存泄露的资源类型的集合
+     * 已汇报的内存泄露的日志的集合
      */
     private final Set<String> reportedLeaks =
             Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
@@ -203,7 +203,7 @@ public class ResourceLeakDetector<T> {
      */
     private final String resourceType;
     /**
-     * 采集评率
+     * 采集频率
      */
     private final int samplingInterval;
 
@@ -271,6 +271,7 @@ public class ResourceLeakDetector<T> {
     }
 
     /**
+     * 给指定资源( 例如 ByteBuf 对象 )创建一个检测它是否泄漏的 ResourceLeakTracker 对象
      * Creates a new {@link ResourceLeakTracker} which is expected to be closed via
      * {@link ResourceLeakTracker#close(Object)} when the related resource is deallocated.
      *
@@ -282,7 +283,7 @@ public class ResourceLeakDetector<T> {
     }
 
     /**
-     * 给指定资源( 例如 ByteBuf 对象 )创建一个检测它是否泄漏的 ResourceLeakTracker 对象
+     * 一旦要创建 DefaultResourceLeak, 则日志打印内存泄漏情况
      */
     @SuppressWarnings("unchecked")
     private DefaultResourceLeak track0(T obj) {
@@ -294,7 +295,7 @@ public class ResourceLeakDetector<T> {
 
         // SIMPLE 和 ADVANCED
         if (level.ordinal() < Level.PARANOID.ordinal()) {
-            // 随机
+            // 随机成功才触发
             if ((PlatformDependent.threadLocalRandom().nextInt(samplingInterval)) == 0) {
                 // 汇报内存是否泄漏
                 reportLeak();
@@ -358,16 +359,21 @@ public class ResourceLeakDetector<T> {
 
             // 清理，并返回是否内存泄露
             if (!ref.dispose()) {
+                //没清理成功, 则表示没有内存泄漏
                 continue;
             }
 
-            // 获得 Record 日志
+            //如果有内存泄漏, 则生成调用记录日志
+
+            // 生成 Record 日志
             String records = ref.toString();
             // 相同 Record 日志，只汇报一次
             if (reportedLeaks.add(records)) {
+                //打印没有追踪日志
                 if (records.isEmpty()) {
                     reportUntracedLeak(resourceType);
                 } else {
+                    //打印有追踪日志
                     reportTracedLeak(resourceType, records);
                 }
             }
@@ -461,9 +467,12 @@ public class ResourceLeakDetector<T> {
             // Store the hash of the tracked object to later assert it in the close(...) method.
             // It's important that we not store a reference to the referent as this would disallow it from
             // be collected via the WeakReference.
+            //获取对象的 hashCode
             trackedHash = System.identityHashCode(referent);
+            //将当前对象添加到 allLeaks 中
             allLeaks.add(this);
             // Create a new Record so we always have the creation stacktrace included.
+            //创建 Record 头节点
             headUpdater.set(this, new Record(Record.BOTTOM));
             this.allLeaks = allLeaks;
         }
@@ -546,6 +555,7 @@ public class ResourceLeakDetector<T> {
             // 清理 referent 的引用
             clear();
             // 移除出 allLeaks 。移除成功，意味着内存泄露。
+            // 因为如果有成功释放对象的话, 会删除在 allLeaks 中的对象
             return allLeaks.remove(this);
         }
 

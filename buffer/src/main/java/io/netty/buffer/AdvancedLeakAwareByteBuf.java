@@ -33,6 +33,10 @@ import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 
+/**
+ * 继承 SimpleLeakAwareByteBuf 类，ADVANCED 和 PARANOID 级别的 LeakAware ByteBuf 实现类。
+ *  - 有 refCount 操作的方法都记录到 Record 中, 也可配置非 refCount 操作的方法进行 Record
+ */
 final class AdvancedLeakAwareByteBuf extends SimpleLeakAwareByteBuf {
 
     private static final String PROP_ACQUIRE_AND_RELEASE_ONLY = "io.netty.leakDetection.acquireAndReleaseOnly";

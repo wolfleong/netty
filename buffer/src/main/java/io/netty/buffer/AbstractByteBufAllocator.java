@@ -49,10 +49,14 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
 
     protected static ByteBuf toLeakAwareBuffer(ByteBuf buf) {
         ResourceLeakTracker<ByteBuf> leak;
+        //获取内存探测级别
         switch (ResourceLeakDetector.getLevel()) {
             case SIMPLE:
+                //创建内存跟踪对象
                 leak = AbstractByteBuf.leakDetector.track(buf);
+                //如果不为 null, 表示当前对象需要跟踪
                 if (leak != null) {
+                    //创建 SimpleLeakAwareByteBuf
                     buf = new SimpleLeakAwareByteBuf(buf, leak);
                 }
                 break;

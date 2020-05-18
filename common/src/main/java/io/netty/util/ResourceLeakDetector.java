@@ -42,6 +42,10 @@ import static io.netty.util.internal.StringUtil.simpleClassName;
 
 /**
  * 内存泄露检测器
+ * ResourceLeakDetector 为了检测内存是否泄漏，使用了 WeakReference( 弱引用 ) 和 ReferenceQueue( 引用队列 )，过程如下：
+ *  - 根据检测级别和采样率的设置，在需要时为需要检测的 ByteBuf 创建 WeakReference 引用。
+ *  - 当 JVM 回收掉 ByteBuf 对象时，JVM 会将 WeakReference 放入ReferenceQueue 队列中。
+ *  - 通过对 ReferenceQueue 中 WeakReference 的检查，判断在 GC 前是否有释放 ByteBuf 的资源，就可以知道是否有资源释放
  */
 public class ResourceLeakDetector<T> {
 
@@ -74,20 +78,25 @@ public class ResourceLeakDetector<T> {
      */
     public enum Level {
         /**
+         * 禁用（DISABLED） - 完全禁止泄露检测，省点消耗
          * Disables resource leak detection.
          */
         DISABLED,
         /**
+         * 简单（SIMPLE） - 默认等级，告诉我们取样的1%的ByteBuf是否发生了泄露，但总共一次只打印一次，看不到就没有了
+         *
          * Enables simplistic sampling resource leak detection which reports there is a leak or not,
          * at the cost of small overhead (default).
          */
         SIMPLE,
         /**
+         * 高级（ADVANCED） - 告诉我们取样的1%的ByteBuf发生泄露的地方。每种类型的泄漏（创建的地方与访问路径一致）只打印一次。对性能有影响
          * Enables advanced sampling resource leak detection which reports where the leaked object was accessed
          * recently at the cost of high overhead.
          */
         ADVANCED,
         /**
+         * 偏执（PARANOID） - 跟高级选项类似，但此选项检测所有ByteBuf，而不仅仅是取样的那1%。对性能有绝大的影响
          * Enables paranoid resource leak detection which reports where the leaked object was accessed recently,
          * at the cost of the highest possible overhead (for testing purposes only).
          */

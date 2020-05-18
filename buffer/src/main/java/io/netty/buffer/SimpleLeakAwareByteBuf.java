@@ -24,7 +24,7 @@ import java.nio.ByteOrder;
 
 /**
  * 继承 WrappedByteBuf 类，Simple 级别的 LeakAware ByteBuf 实现类。
- * - 主要做用是对一些子 ByteBuf 的包装返回和在 ByteBuf 完全释放(release)时关闭内存泄漏探测
+ * - 主要做用是在 ByteBuf 完全释放(release)时关闭内存泄漏探测, 这个类没有调用 ResourceLeakTracker.record() 方法
  */
 class SimpleLeakAwareByteBuf extends WrappedByteBuf {
 

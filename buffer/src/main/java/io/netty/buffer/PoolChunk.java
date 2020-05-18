@@ -242,7 +242,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
         // 初始化 memoryMap 和 depthMap
         // Generate the memory map.
         //满二叉树, 刚好叶子节点等于所有非叶子节点
-        //4096
+        //2048 << 1 = 4096
         memoryMap = new byte[maxSubpageAllocs << 1];
         depthMap = new byte[memoryMap.length];
         int memoryMapIndex = 1;
@@ -250,6 +250,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
             int depth = 1 << d;
             for (int p = 0; p < depth; ++ p) {
                 // in each level traverse left to right and set value to the depth of subtree
+                //设置深度
                 memoryMap[memoryMapIndex] = (byte) d;
                 depthMap[memoryMapIndex] = (byte) d;
                 memoryMapIndex ++;
@@ -317,7 +318,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
      */
     boolean allocate(PooledByteBuf<T> buf, int reqCapacity, int normCapacity) {
         final long handle;
-        // 大于等于 Page 大小，分配 Page 内存块
+        // 大于等于 Page(8K) 大小，分配 Page 内存块
         if ((normCapacity & subpageOverflowMask) != 0) { // >= pageSize
             handle =  allocateRun(normCapacity);
         } else {

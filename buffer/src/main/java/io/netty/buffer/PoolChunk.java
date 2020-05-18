@@ -132,10 +132,15 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * 分配信息满二叉树
      * index 为节点编号
      *
+     * 可以这么理解这个值, 它记录着最高可分配的深度, 默认是当前深度可完全分配, 如果当前节点的子节点被分配了一部分, 则为子节点的最小深度
+     *
      * memoryMap 数组的值，总结为 3 种情况：
-     * 1、memoryMap[id] = depthMap[id] ，该节点没有被分配。
-     * 2、最大高度 >= memoryMap[id] > depthMap[id] ，至少有一个子节点被分配，不能再分配该高度满足的内存，但可以根据实际分配较小一些的内存。
+     * 1、该节点没有被分配: memoryMap[id] = depthMap[id]。
+     *
+     * 2、该节点被分配了一部分: memoryMap[id] 为子节点的较小的值, 也就是 depthMap[id] < memoryMap[id] <= 最大高度(11)
+     *    - 最大高度 >= memoryMap[id] > depthMap[id] ，至少有一个子节点被分配，不能再分配该高度满足的内存，但可以根据实际分配较小一些的内存。
      *    比如，上图中父节点 2 分配了子节点 4，值从 1 更新为 2，表示该节点不能再分配 8MB 的只能最大分配 4MB 内存，即只剩下节点 5 可用。
+     *
      * 3、memoryMap[id] = 最大高度 + 1 ，该节点及其子节点已被完全分配，没有剩余空间。
      */
     private final byte[] memoryMap;
@@ -422,9 +427,10 @@ final class PoolChunk<T> implements PoolChunkMetric {
         }
         // 获得第 d 层，匹配的节点。
         // id & initial 来保证，高度小于 d 会继续循环
-        // val >=d 有两种情况, id 这个位置已经被分配过了或 id 这个位置就是d 层级
-        // (id & initial) == 0 表示当前位置的索引是小于 d 的, 所以要继续往下走
+        // val >=d 有两种情况, id 这个位置已经被分配了部分或 id 这个位置就是 d 层级
+        // (id & initial) == 0 表示当前位置的索引是小于 d 层的最小索引, 所以要继续往下走
         // (id & initial) == 0 相当于 id < (1 << d), 也就是没有到 d 层级的值
+        // 1 << d 表示 d 层的最小索引, 如果当前节点(id)已经被分配了一部分, 剩下可分配的层数是 d, 也就是 val 为 d, 那么 id & initial 肯定为 0
         while (val < d || (id & initial) == 0) { // id & initial == 1 << d for all ids at depth d, for < d it is 0
             // 进入下一层
             // 获得左节点的编号

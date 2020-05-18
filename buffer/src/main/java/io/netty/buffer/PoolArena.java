@@ -105,17 +105,20 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     final int directMemoryCacheAlignmentMask;
     /**
      * tiny 类型的 PoolSubpage 数组
+     * 16B ~ 496B, 每次 16B 递增
      *
      * 数组的每个元素，都是双向链表
      */
     private final PoolSubpage<T>[] tinySubpagePools;
     /**
      * small 类型的 SubpagePools 数组
+     * 512B ~ 4KB, 每次 2 倍递增
      *
      * 数组的每个元素，都是双向链表
      */
     private final PoolSubpage<T>[] smallSubpagePools;
 
+    // Chunk 是 8K ~ 16M , 每次 2 倍递增
     // PoolChunkList 之间的双向链表
     private final PoolChunkList<T> q050;
     private final PoolChunkList<T> q025;
@@ -190,13 +193,13 @@ abstract class PoolArena<T> implements PoolArenaMetric {
         directMemoryCacheAlignment = cacheAlignment;
         directMemoryCacheAlignmentMask = cacheAlignment - 1;
         subpageOverflowMask = ~(pageSize - 1);
-        // 初始化 tinySubpagePools 数组
+        // 初始化 tinySubpagePools 数组, numTinySubpagePools 默认 32
         tinySubpagePools = newSubpagePoolArray(numTinySubpagePools);
         for (int i = 0; i < tinySubpagePools.length; i ++) {
             tinySubpagePools[i] = newSubpagePoolHead(pageSize);
         }
 
-        // 初始化 smallSubpagePools 数组
+        // 初始化 smallSubpagePools 数组,
         numSmallSubpagePools = pageShifts - 9;
         smallSubpagePools = newSubpagePoolArray(numSmallSubpagePools);
         for (int i = 0; i < smallSubpagePools.length; i ++) {

@@ -173,6 +173,9 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         }
     }
 
+    /**
+     * 主要做一些统计和检测
+     */
     private static final class InstrumentedUnpooledHeapByteBuf extends UnpooledHeapByteBuf {
         InstrumentedUnpooledHeapByteBuf(UnpooledByteBufAllocator alloc, int initialCapacity, int maxCapacity) {
             super(alloc, initialCapacity, maxCapacity);
@@ -181,6 +184,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         @Override
         protected byte[] allocateArray(int initialCapacity) {
             byte[] bytes = super.allocateArray(initialCapacity);
+            //增加统计
             ((UnpooledByteBufAllocator) alloc()).incrementHeap(bytes.length);
             return bytes;
         }
@@ -189,6 +193,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         protected void freeArray(byte[] array) {
             int length = array.length;
             super.freeArray(array);
+            //减少统计
             ((UnpooledByteBufAllocator) alloc()).decrementHeap(length);
         }
     }
@@ -203,6 +208,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         @Override
         protected ByteBuffer allocateDirect(int initialCapacity) {
             ByteBuffer buffer = super.allocateDirect(initialCapacity);
+            //增加统计
             ((UnpooledByteBufAllocator) alloc()).incrementDirect(buffer.capacity());
             return buffer;
         }
@@ -211,6 +217,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         ByteBuffer reallocateDirect(ByteBuffer oldBuffer, int initialCapacity) {
             int capacity = oldBuffer.capacity();
             ByteBuffer buffer = super.reallocateDirect(oldBuffer, initialCapacity);
+            //重新计算容器
             ((UnpooledByteBufAllocator) alloc()).incrementDirect(buffer.capacity() - capacity);
             return buffer;
         }
@@ -219,6 +226,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         protected void freeDirect(ByteBuffer buffer) {
             int capacity = buffer.capacity();
             super.freeDirect(buffer);
+            //减少统计
             ((UnpooledByteBufAllocator) alloc()).decrementDirect(capacity);
         }
     }

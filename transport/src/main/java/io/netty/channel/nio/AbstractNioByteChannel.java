@@ -294,6 +294,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
         int writeSpinCount = config().getWriteSpinCount();
         do {
+            //获取已经标记刷新的对象
             Object msg = in.current();
             if (msg == null) {
                 // Wrote all messages.
@@ -301,6 +302,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 // Directly return here so incompleteWrite(...) is not called.
                 return;
             }
+            //执行写入
             writeSpinCount -= doWriteInternal(in, msg);
         } while (writeSpinCount > 0);
 

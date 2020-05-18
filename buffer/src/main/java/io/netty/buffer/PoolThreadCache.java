@@ -57,19 +57,19 @@ final class PoolThreadCache {
 
     // Hold the caches for the different size classes, which are tiny, small and normal.
     /**
-     * Heap 类型的 tiny Subpage 内存块缓存数组
+     * Heap 类型的 tiny Subpage 内存块缓存数组, 默认情况下，数组大小为 512
      */
     private final MemoryRegionCache<byte[]>[] tinySubPageHeapCaches;
     /**
-     * Heap 类型的 small Subpage 内存块缓存数组
+     * Heap 类型的 small Subpage 内存块缓存数组, 默认情况下，数组大小为 256
      */
     private final MemoryRegionCache<byte[]>[] smallSubPageHeapCaches;
     /**
-     * Direct 类型的 tiny Subpage 内存块缓存数组
+     * Direct 类型的 tiny Subpage 内存块缓存数组, 默认情况下，数组大小为 512
      */
     private final MemoryRegionCache<ByteBuffer>[] tinySubPageDirectCaches;
     /**
-     * Direct 类型的 tiny Subpage 内存块缓存数组
+     * Direct 类型的 tiny Subpage 内存块缓存数组, 默认情况下，数组大小为 256
      */
     private final MemoryRegionCache<ByteBuffer>[] smallSubPageDirectCaches;
     /**
@@ -77,7 +77,7 @@ final class PoolThreadCache {
      */
     private final MemoryRegionCache<byte[]>[] normalHeapCaches;
     /**
-     * Direct 类型的 normal 内存块缓存数组
+     * Direct 类型的 normal 内存块缓存数组, 默认情况下，数组大小为 64
      */
     private final MemoryRegionCache<ByteBuffer>[] normalDirectCaches;
 

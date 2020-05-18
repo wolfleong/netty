@@ -105,14 +105,14 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     final int directMemoryCacheAlignmentMask;
     /**
      * tiny 类型的 PoolSubpage 数组
-     * 16B ~ 496B, 每次 16B 递增
+     * 16B ~ 496B, 每次 16B 递增, 长度为 32
      *
      * 数组的每个元素，都是双向链表
      */
     private final PoolSubpage<T>[] tinySubpagePools;
     /**
      * small 类型的 SubpagePools 数组
-     * 512B ~ 4KB, 每次 2 倍递增
+     * 512B ~ 4KB, 每次 2 倍递增, 最多有 4 个, 也就是长度为 4
      *
      * 数组的每个元素，都是双向链表
      */
@@ -188,6 +188,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
         this.parent = parent;
         this.pageSize = pageSize;
         this.maxOrder = maxOrder;
+        //默认是 13
         this.pageShifts = pageShifts;
         this.chunkSize = chunkSize;
         directMemoryCacheAlignment = cacheAlignment;
@@ -199,7 +200,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
             tinySubpagePools[i] = newSubpagePoolHead(pageSize);
         }
 
-        // 初始化 smallSubpagePools 数组,
+        // 初始化 smallSubpagePools 数组, 长度为 4
         numSmallSubpagePools = pageShifts - 9;
         smallSubpagePools = newSubpagePoolArray(numSmallSubpagePools);
         for (int i = 0; i < smallSubpagePools.length; i ++) {
@@ -376,6 +377,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
             // 返回，因为已经分配成功
             return;
         }
+        // normCapacity <= 16M
         if (normCapacity <= chunkSize) {
             // 从 PoolThreadCache 缓存中，分配 normal 内存块，并初始化到 PooledByteBuf 中。
             if (cache.allocateNormal(this, buf, reqCapacity, normCapacity)) {

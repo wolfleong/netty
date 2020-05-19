@@ -302,6 +302,8 @@ public abstract class Recycler<T> {
     }
 
     /**
+     * 这里存储其他线程的 Stack 对应的 WeakOrderQueue, 其他线程可能有多个
+     *
      * 1、每个Recycler类（而不是每一个Recycler对象）都有一个DELAYED_RECYCLED
      * 原因：可以根据一个Stack<T>对象唯一的找到一个WeakOrderQueue对象，所以此处不需要每个对象建立一个DELAYED_RECYCLED
      * 2、由于DELAYED_RECYCLED是一个类变量，所以需要包容多个T，此处泛型需要使用?
@@ -960,7 +962,7 @@ public abstract class Recycler<T> {
 
         /**
          * 异线程回收对象
-         * 先将item元素加入WeakOrderQueue，后续再从WeakOrderQueue中将元素压入Stack中
+         * 先将 item 元素加入 WeakOrderQueue，后续再从 WeakOrderQueue 中将元素压入 Stack 中
          */
         private void pushLater(DefaultHandle<?> item, Thread thread) {
             if (maxDelayedQueues == 0) {

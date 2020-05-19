@@ -438,6 +438,7 @@ abstract class PoolArena<T> implements PoolArenaMetric {
     }
 
     void free(PoolChunk<T> chunk, ByteBuffer nioBuffer, long handle, int normCapacity, PoolThreadCache cache) {
+        //非池化, Huge 类型的内存
         if (chunk.unpooled) {
             int size = chunk.chunkSize();
             // 直接销毁 Chunk 内存块，因为占用空间较大

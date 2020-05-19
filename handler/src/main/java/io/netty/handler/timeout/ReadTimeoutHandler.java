@@ -24,6 +24,7 @@ import io.netty.channel.ChannelInitializer;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * 当 Channel 的读空闲时间( 读或者写 )太长时，抛出 ReadTimeoutException 异常，并自动关闭该 Channel
  * Raises a {@link ReadTimeoutException} when no data was read within a certain
  * period of time.
  *
@@ -81,6 +82,7 @@ public class ReadTimeoutHandler extends IdleStateHandler {
      *        the {@link TimeUnit} of {@code timeout}
      */
     public ReadTimeoutHandler(long timeout, TimeUnit unit) {
+        // 禁用 Write / All 的空闲检测
         super(timeout, 0, 0, unit);
     }
 
@@ -95,8 +97,11 @@ public class ReadTimeoutHandler extends IdleStateHandler {
      */
     protected void readTimedOut(ChannelHandlerContext ctx) throws Exception {
         if (!closed) {
+            //触发 Exception Caught 事件到 pipeline 中，异常为 ReadTimeoutException
             ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
+            //关闭 Channel 通道
             ctx.close();
+            //标记 Channel 为已关闭
             closed = true;
         }
     }

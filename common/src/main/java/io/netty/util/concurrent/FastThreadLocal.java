@@ -23,6 +23,9 @@ import java.util.IdentityHashMap;
 import java.util.Set;
 
 /**
+ *
+ * 注意: Netty 的线程基本不会变量的, 一旦创建就基本固定了
+ *
  * 性能优化:
  *  - 通过下标直接访问替代ThreadLocal通过哈希和哈希表, 定位更快
  *  - FastThreadLocal利用字节填充来解决伪共享问题
@@ -31,6 +34,7 @@ import java.util.Set;
  * FastThreadLocal 缺点:
  * - 空间换时间, 数组长度随着 index 的增长而增长
  * - 必须使用 FastThreadLocalThread 性能才好
+ *
  * A special variant of {@link ThreadLocal} that yields higher access performance when accessed from a
  * {@link FastThreadLocalThread}.
  * <p>
@@ -52,7 +56,9 @@ import java.util.Set;
 public class FastThreadLocal<V> {
 
     /**
-     * 用于存储 FastThreadLocal 集合的下标
+     * 用于存储当前线程中所有 FastThreadLocal 集合的下标
+     * - 每个线程可以有多个 FastThreadLocal, 但是每个线程只有一个 InternalThreadLocalMap
+     * - 如果不存在一个指定索引的集合, 当要获取所有 FastThreadLocal 时, 就要遍历 InternalThreadLocalMap, 这样的话性能不可取
      */
     private static final int variablesToRemoveIndex = InternalThreadLocalMap.nextVariableIndex();
 

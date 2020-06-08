@@ -32,7 +32,7 @@ public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
             ReferenceCountUpdater.getUnsafeOffset(AbstractReferenceCountedByteBuf.class, "refCnt");
     /**
      * {@link #refCnt} 字段的原子更新器
-     *
+     * 性能优化
      * 计数器基于 AtomicIntegerFieldUpdater ，为什么不直接用 AtomicInteger ？
      * 因为 ByteBuf 对象很多，如果都把 int 包一层 AtomicInteger 花销较大，而AtomicIntegerFieldUpdater 只需要一个全局的静态变量。
      */
